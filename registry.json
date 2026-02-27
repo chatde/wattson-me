@@ -1,0 +1,22 @@
+{
+  "nodes": [
+    {
+      "id": "node-1",
+      "name": "Note 9",
+      "type": "phone",
+      "model": "wattson:chat",
+      "modelSize": "1.7b",
+      "ollamaUrl": "http://192.168.5.48:11434",
+      "status": "online",
+      "powerMode": "FULL_FORCE",
+      "specs": {
+        "ram": "4GB",
+        "cpu": "Exynos 9810",
+        "os": "Android (Termux)"
+      },
+      "joinedAt": "2026-02-26T00:00:00Z"
+    }
+  ],
+  "totalQueries": 0,
+  "networkVersion": "0.1.0"
+}

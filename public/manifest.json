@@ -1,0 +1,12 @@
+{
+  "name": "Wattson — AI For the World",
+  "short_name": "Wattson",
+  "description": "Free AI powered by the devices you forgot about.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050510",
+  "theme_color": "#050510",
+  "orientation": "any",
+  "categories": ["utilities", "productivity"],
+  "icons": []
+}

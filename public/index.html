@@ -1,0 +1,1577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover">
+<meta name="theme-color" content="#050510">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Free AI powered by the devices you forgot about. Ask anything.">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='11' cy='14' r='4' fill='%230A84FF'/><circle cx='21' cy='14' r='4' fill='%230A84FF'/></svg>">
+<title>Wattson — AI For the World</title>
+<style>
+/* ── Reset & Base ─────────────────────────────────────────────────────────── */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{font-size:16px;-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,Oxygen,Ubuntu,sans-serif;
+  color:#F5F5F7;
+  background:#050510;
+  background-image:
+    radial-gradient(ellipse at 15% 50%,rgba(30,15,70,0.35) 0%,transparent 50%),
+    radial-gradient(ellipse at 85% 15%,rgba(10,30,90,0.25) 0%,transparent 40%),
+    radial-gradient(ellipse at 50% 85%,rgba(25,10,55,0.2) 0%,transparent 45%);
+  background-attachment:fixed;
+  min-height:100vh;
+  min-height:100dvh;
+  overflow-x:hidden;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+a{color:#0A84FF;text-decoration:none}
+a:hover{color:#409CFF}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+
+/* ── Stars Canvas ─────────────────────────────────────────────────────────── */
+#stars-canvas{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  pointer-events:none;z-index:0;
+}
+
+/* ── Navigation ───────────────────────────────────────────────────────────── */
+#nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  height:56px;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;
+  background:rgba(5,5,16,0.7);
+  -webkit-backdrop-filter:blur(20px) saturate(1.8);
+  backdrop-filter:blur(20px) saturate(1.8);
+  border-bottom:1px solid rgba(255,255,255,0.06);
+  transition:background 0.3s ease;
+}
+#nav.scrolled{background:rgba(5,5,16,0.92)}
+.nav-logo{
+  font-size:20px;font-weight:700;letter-spacing:-0.02em;
+  color:#F5F5F7;cursor:pointer;
+  display:flex;align-items:center;gap:10px;
+  user-select:none;
+}
+.nav-logo .logo-eyes{
+  display:flex;gap:4px;
+}
+.nav-logo .logo-eye{
+  width:10px;height:10px;border-radius:50%;
+  background:radial-gradient(circle at 40% 40%,#5dade2 0%,#1a5276 100%);
+  box-shadow:0 0 6px rgba(52,152,219,0.5);
+}
+.nav-tabs{display:flex;gap:4px;list-style:none}
+.nav-tab{
+  padding:8px 16px;border-radius:20px;
+  font-size:14px;font-weight:500;
+  color:rgba(245,245,247,0.6);
+  transition:all 0.2s ease;
+  cursor:pointer;
+  min-height:36px;display:flex;align-items:center;
+}
+.nav-tab:hover{color:#F5F5F7;background:rgba(255,255,255,0.06)}
+.nav-tab.active{color:#F5F5F7;background:rgba(10,132,255,0.15)}
+.nav-hamburger{
+  display:none;width:44px;height:44px;
+  align-items:center;justify-content:center;
+  border-radius:8px;
+}
+.nav-hamburger:hover{background:rgba(255,255,255,0.06)}
+.hamburger-icon{
+  width:20px;height:14px;position:relative;
+  display:flex;flex-direction:column;justify-content:space-between;
+}
+.hamburger-icon span{
+  display:block;height:2px;background:#F5F5F7;border-radius:1px;
+  transition:all 0.3s ease;
+}
+.nav-hamburger.open .hamburger-icon span:nth-child(1){transform:translateY(6px) rotate(45deg)}
+.nav-hamburger.open .hamburger-icon span:nth-child(2){opacity:0}
+.nav-hamburger.open .hamburger-icon span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
+.mobile-menu{
+  display:none;position:fixed;
+  top:56px;left:0;right:0;
+  background:rgba(5,5,16,0.95);
+  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);
+  border-bottom:1px solid rgba(255,255,255,0.06);
+  padding:8px 16px 16px;z-index:99;
+  transform:translateY(-100%);opacity:0;
+  transition:transform 0.3s ease,opacity 0.3s ease;
+}
+.mobile-menu.open{transform:translateY(0);opacity:1}
+.mobile-menu-item{
+  display:block;padding:14px 16px;
+  font-size:17px;font-weight:500;
+  color:rgba(245,245,247,0.7);border-radius:12px;
+  transition:all 0.2s ease;cursor:pointer;
+}
+.mobile-menu-item:hover,.mobile-menu-item.active{
+  color:#F5F5F7;background:rgba(255,255,255,0.06);
+}
+
+/* ── Page Container ───────────────────────────────────────────────────────── */
+main{position:relative;z-index:1;min-height:100vh;min-height:100dvh}
+.page{
+  display:none;opacity:0;
+  transition:opacity 0.3s ease;
+  padding-top:56px;
+  padding-bottom:env(safe-area-inset-bottom,0);
+}
+.page.active{display:block}
+.page.visible{opacity:1}
+
+/* ── HOME PAGE ────────────────────────────────────────────────────────────── */
+#page-home{
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;
+  min-height:100vh;min-height:100dvh;
+  padding:56px 24px env(safe-area-inset-bottom,24px);
+  transition:opacity 0.3s ease;
+}
+#page-home.has-results{justify-content:flex-start;padding-top:120px}
+.home-logo{
+  font-size:clamp(3rem,8vw,5rem);font-weight:700;
+  letter-spacing:-0.03em;
+  background:linear-gradient(135deg,#F5F5F7 0%,rgba(245,245,247,0.7) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+  margin-bottom:8px;
+  user-select:none;
+  transition:all 0.5s ease;
+}
+#page-home.has-results .home-logo{font-size:clamp(1.5rem,4vw,2rem);margin-bottom:16px}
+.home-tagline{
+  font-size:clamp(0.9rem,2.5vw,1.1rem);
+  color:rgba(245,245,247,0.45);
+  margin-bottom:40px;
+  text-align:center;
+  transition:all 0.5s ease;
+}
+#page-home.has-results .home-tagline{display:none}
+
+/* Search Bar */
+.search-container{
+  width:100%;max-width:640px;
+  position:relative;
+  margin-bottom:24px;
+  transition:all 0.3s ease;
+}
+.search-bar{
+  width:100%;
+  padding:16px 56px 16px 24px;
+  font-size:17px;font-family:inherit;
+  color:#F5F5F7;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:50px;
+  outline:none;
+  transition:all 0.3s ease;
+}
+.search-bar::placeholder{color:rgba(245,245,247,0.3)}
+.search-bar:focus{
+  background:rgba(255,255,255,0.09);
+  border-color:rgba(10,132,255,0.4);
+  box-shadow:0 0 0 3px rgba(10,132,255,0.1),0 8px 32px rgba(0,0,0,0.3);
+}
+.search-actions{
+  position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  display:flex;gap:4px;align-items:center;
+}
+.search-btn{
+  width:40px;height:40px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.2s ease;
+  color:rgba(245,245,247,0.5);
+}
+.search-btn:hover{background:rgba(255,255,255,0.08);color:#F5F5F7}
+.search-btn.primary{background:#0A84FF;color:#fff}
+.search-btn.primary:hover{background:#409CFF}
+.search-btn.primary:disabled{background:rgba(10,132,255,0.3);cursor:not-allowed}
+.search-btn svg{width:20px;height:20px}
+#voice-btn.listening{background:rgba(255,59,48,0.2);color:#FF453A;animation:pulse-listen 1.5s ease infinite}
+@keyframes pulse-listen{0%,100%{box-shadow:0 0 0 0 rgba(255,59,48,0.3)}50%{box-shadow:0 0 0 10px rgba(255,59,48,0)}}
+.device-count{
+  font-size:13px;color:rgba(245,245,247,0.3);
+  text-align:center;
+  transition:all 0.5s ease;
+}
+#page-home.has-results .device-count{display:none}
+
+/* Search Results */
+.results-area{
+  width:100%;max-width:640px;
+  margin-top:16px;
+}
+.result-card{
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:16px;
+  padding:24px;
+  margin-bottom:16px;
+  animation:fadeSlideUp 0.4s ease;
+}
+.result-query{
+  font-size:13px;color:rgba(245,245,247,0.35);
+  margin-bottom:12px;
+  display:flex;align-items:center;gap:8px;
+}
+.result-query::before{
+  content:'';display:block;width:6px;height:6px;
+  border-radius:50%;background:#0A84FF;flex-shrink:0;
+}
+.result-text{
+  font-size:16px;line-height:1.65;
+  color:rgba(245,245,247,0.85);
+}
+.result-text .cursor{
+  display:inline-block;width:2px;height:1.1em;
+  background:#0A84FF;vertical-align:text-bottom;
+  animation:blink-cursor 0.8s step-end infinite;
+}
+@keyframes blink-cursor{0%,100%{opacity:1}50%{opacity:0}}
+.loading-shimmer{
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:16px;
+  padding:24px;
+  animation:fadeSlideUp 0.4s ease;
+}
+.shimmer-line{
+  height:14px;border-radius:7px;
+  background:linear-gradient(90deg,rgba(255,255,255,0.04) 0%,rgba(255,255,255,0.08) 50%,rgba(255,255,255,0.04) 100%);
+  background-size:200% 100%;
+  animation:shimmer 1.5s ease infinite;
+  margin-bottom:12px;
+}
+.shimmer-line:nth-child(1){width:90%}
+.shimmer-line:nth-child(2){width:75%}
+.shimmer-line:nth-child(3){width:60%}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@keyframes fadeSlideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── ABOUT PAGE ───────────────────────────────────────────────────────────── */
+.about-content{max-width:720px;margin:0 auto;padding:80px 24px 64px}
+.about-hero{text-align:center;margin-bottom:80px}
+.about-hero h1{
+  font-size:clamp(2rem,5vw,3rem);font-weight:700;
+  letter-spacing:-0.02em;margin-bottom:16px;
+  background:linear-gradient(135deg,#F5F5F7 0%,rgba(245,245,247,0.6) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.about-hero p{
+  font-size:clamp(1rem,2.5vw,1.2rem);
+  color:rgba(245,245,247,0.5);
+  max-width:520px;margin:0 auto;line-height:1.7;
+}
+.about-section{margin-bottom:64px}
+.about-section h2{
+  font-size:clamp(1.3rem,3vw,1.8rem);font-weight:600;
+  letter-spacing:-0.01em;margin-bottom:24px;
+}
+.about-section p,.about-section li{
+  font-size:16px;line-height:1.75;
+  color:rgba(245,245,247,0.65);margin-bottom:16px;
+}
+.about-section ul{list-style:none;padding:0}
+.about-section li{padding-left:24px;position:relative}
+.about-section li::before{
+  content:'';position:absolute;left:0;top:10px;
+  width:8px;height:8px;border-radius:50%;
+  background:#0A84FF;opacity:0.6;
+}
+.about-diagram{
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:16px;padding:32px;
+  margin:32px 0;text-align:center;
+}
+.diagram-flow{
+  display:flex;align-items:center;justify-content:center;
+  flex-wrap:wrap;gap:16px;
+  font-size:14px;color:rgba(245,245,247,0.6);
+}
+.diagram-node{
+  background:rgba(10,132,255,0.1);
+  border:1px solid rgba(10,132,255,0.2);
+  border-radius:12px;padding:12px 20px;
+  font-weight:500;color:rgba(245,245,247,0.8);
+}
+.diagram-arrow{color:rgba(10,132,255,0.4);font-size:20px}
+.about-footer{
+  text-align:center;padding-top:48px;
+  border-top:1px solid rgba(255,255,255,0.06);
+  color:rgba(245,245,247,0.3);font-size:14px;
+}
+.about-footer a{color:#0A84FF}
+
+/* ── START PAGE ───────────────────────────────────────────────────────────── */
+.start-content{max-width:800px;margin:0 auto;padding:80px 24px 64px}
+.start-hero{text-align:center;margin-bottom:64px}
+.start-hero h1{
+  font-size:clamp(2rem,5vw,2.8rem);font-weight:700;
+  letter-spacing:-0.02em;margin-bottom:16px;
+}
+.start-hero p{font-size:17px;color:rgba(245,245,247,0.5);max-width:480px;margin:0 auto}
+.power-modes{display:flex;gap:16px;margin-bottom:64px;flex-wrap:wrap}
+.power-card{
+  flex:1;min-width:220px;
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:16px;padding:28px 24px;
+  transition:all 0.3s ease;
+}
+.power-card:hover{
+  background:rgba(255,255,255,0.05);
+  border-color:rgba(255,255,255,0.12);
+  transform:translateY(-2px);
+}
+.power-icon{
+  font-size:28px;margin-bottom:16px;
+  width:48px;height:48px;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+}
+.power-card.full .power-icon{background:rgba(48,209,88,0.15);color:#30D158}
+.power-card.half .power-icon{background:rgba(255,214,10,0.15);color:#FFD60A}
+.power-card.eco .power-icon{background:rgba(10,132,255,0.15);color:#0A84FF}
+.power-card h3{font-size:18px;font-weight:600;margin-bottom:8px}
+.power-card p{font-size:14px;color:rgba(245,245,247,0.5);line-height:1.6}
+.power-card .power-best{
+  margin-top:12px;padding-top:12px;
+  border-top:1px solid rgba(255,255,255,0.06);
+  font-size:13px;color:rgba(245,245,247,0.35);
+}
+.section-title{
+  font-size:clamp(1.3rem,3vw,1.8rem);font-weight:600;
+  margin-bottom:24px;letter-spacing:-0.01em;
+}
+.device-grid{
+  display:flex;flex-wrap:wrap;gap:12px;margin-bottom:48px;
+}
+.device-tag{
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:50px;padding:8px 20px;
+  font-size:14px;color:rgba(245,245,247,0.65);
+}
+.setup-guides{margin-bottom:48px}
+.setup-item{
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:12px;margin-bottom:8px;
+  overflow:hidden;
+}
+.setup-header{
+  padding:16px 20px;
+  display:flex;align-items:center;justify-content:space-between;
+  cursor:pointer;font-weight:500;font-size:16px;
+  color:rgba(245,245,247,0.8);
+  transition:background 0.2s ease;
+  min-height:52px;
+}
+.setup-header:hover{background:rgba(255,255,255,0.03)}
+.setup-chevron{
+  transition:transform 0.3s ease;
+  color:rgba(245,245,247,0.3);font-size:14px;
+}
+.setup-item.open .setup-chevron{transform:rotate(180deg)}
+.setup-body{
+  max-height:0;overflow:hidden;
+  transition:max-height 0.3s ease;
+}
+.setup-body-inner{
+  padding:0 20px 20px;
+  font-size:14px;color:rgba(245,245,247,0.55);line-height:1.8;
+}
+.setup-body-inner code{
+  background:rgba(255,255,255,0.06);
+  padding:2px 8px;border-radius:6px;
+  font-family:'SF Mono','Fira Code',monospace;
+  font-size:13px;color:rgba(245,245,247,0.75);
+}
+.setup-body-inner pre{
+  background:rgba(0,0,0,0.3);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:8px;padding:16px;
+  margin:12px 0;overflow-x:auto;
+  font-family:'SF Mono','Fira Code',monospace;
+  font-size:13px;line-height:1.6;
+  color:rgba(245,245,247,0.75);
+}
+.faq-section{margin-top:48px}
+.faq-item{margin-bottom:24px}
+.faq-item h4{font-size:16px;font-weight:600;margin-bottom:8px;color:rgba(245,245,247,0.85)}
+.faq-item p{font-size:15px;color:rgba(245,245,247,0.5);line-height:1.7}
+
+/* ── MEET PAGE ────────────────────────────────────────────────────────────── */
+.meet-content{
+  max-width:960px;margin:0 auto;
+  padding:72px 24px 24px;
+  display:flex;gap:24px;
+  min-height:calc(100vh - 56px);
+  min-height:calc(100dvh - 56px);
+}
+.meet-face-col{
+  flex:0 0 360px;
+  display:flex;flex-direction:column;gap:16px;
+}
+.face-container{
+  background:rgba(255,255,255,0.02);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:16px;overflow:hidden;
+  position:relative;
+  aspect-ratio:1;
+}
+.face-container canvas{display:block;width:100%;height:100%}
+.face-edge-glow{
+  position:absolute;top:0;left:0;right:0;bottom:0;
+  pointer-events:none;border-radius:16px;
+  box-shadow:inset 0 0 20px 10px rgba(70,130,255,0.0);
+  transition:box-shadow 0.3s ease;
+}
+.meet-stats{
+  display:flex;flex-wrap:wrap;gap:8px;
+}
+.stat-badge{
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:8px;padding:8px 14px;
+  font-size:12px;color:rgba(245,245,247,0.5);
+  font-family:'SF Mono','Fira Code',monospace;
+  display:flex;align-items:center;gap:6px;
+}
+.stat-badge .stat-dot{width:6px;height:6px;border-radius:50%;background:#30D158}
+.stat-badge .stat-dot.warn{background:#FFD60A}
+.stat-badge .stat-dot.danger{background:#FF453A}
+.stat-badge .stat-dot.offline{background:rgba(245,245,247,0.2)}
+.meet-thought{
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:12px;padding:14px 16px;
+  font-size:13px;color:rgba(245,245,247,0.4);
+  font-style:italic;min-height:48px;
+  display:flex;align-items:center;
+}
+
+/* Chat Column */
+.meet-chat-col{
+  flex:1;display:flex;flex-direction:column;
+  min-width:0;
+}
+.chat-messages{
+  flex:1;overflow-y:auto;
+  padding:8px 0;
+  display:flex;flex-direction:column;gap:12px;
+  scrollbar-width:thin;
+  scrollbar-color:rgba(255,255,255,0.1) transparent;
+}
+.chat-messages::-webkit-scrollbar{width:4px}
+.chat-messages::-webkit-scrollbar-track{background:transparent}
+.chat-messages::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px}
+.chat-bubble{
+  max-width:85%;padding:14px 18px;
+  border-radius:18px;font-size:15px;line-height:1.6;
+  animation:fadeSlideUp 0.3s ease;
+  word-wrap:break-word;
+}
+.chat-bubble.user{
+  align-self:flex-end;
+  background:rgba(10,132,255,0.2);
+  border:1px solid rgba(10,132,255,0.15);
+  border-bottom-right-radius:6px;
+  color:rgba(245,245,247,0.9);
+}
+.chat-bubble.assistant{
+  align-self:flex-start;
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.06);
+  border-bottom-left-radius:6px;
+  color:rgba(245,245,247,0.8);
+}
+.chat-bubble.system{
+  align-self:center;
+  background:transparent;
+  font-size:13px;color:rgba(245,245,247,0.3);
+  padding:8px;
+}
+.chat-input-area{
+  display:flex;gap:8px;
+  padding-top:16px;
+  border-top:1px solid rgba(255,255,255,0.06);
+  margin-top:8px;
+}
+.chat-input{
+  flex:1;
+  padding:12px 18px;
+  font-size:15px;font-family:inherit;
+  color:#F5F5F7;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:24px;
+  outline:none;
+  transition:all 0.2s ease;
+  min-height:44px;
+}
+.chat-input::placeholder{color:rgba(245,245,247,0.3)}
+.chat-input:focus{
+  background:rgba(255,255,255,0.08);
+  border-color:rgba(10,132,255,0.3);
+}
+.chat-send{
+  width:44px;height:44px;border-radius:50%;
+  background:#0A84FF;color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.2s ease;flex-shrink:0;
+}
+.chat-send:hover{background:#409CFF}
+.chat-send:disabled{background:rgba(10,132,255,0.3);cursor:not-allowed}
+.chat-send svg{width:18px;height:18px}
+
+/* ── CONNECT PAGE ─────────────────────────────────────────────────────────── */
+.connect-content{max-width:800px;margin:0 auto;padding:80px 24px 64px}
+.connect-hero{text-align:center;margin-bottom:48px}
+.connect-hero h1{
+  font-size:clamp(1.8rem,4vw,2.5rem);font-weight:700;
+  letter-spacing:-0.02em;margin-bottom:12px;
+}
+.connect-hero p{font-size:16px;color:rgba(245,245,247,0.45)}
+.network-overview{
+  display:flex;gap:16px;margin-bottom:40px;flex-wrap:wrap;
+}
+.network-stat{
+  flex:1;min-width:140px;
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:12px;padding:20px;
+  text-align:center;
+}
+.network-stat .stat-value{
+  font-size:clamp(1.5rem,4vw,2rem);font-weight:700;
+  color:#F5F5F7;margin-bottom:4px;
+}
+.network-stat .stat-label{
+  font-size:13px;color:rgba(245,245,247,0.35);
+}
+.node-list{margin-bottom:40px}
+.node-card{
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:12px;padding:20px 24px;
+  margin-bottom:8px;
+  display:flex;align-items:center;gap:16px;
+}
+.node-indicator{
+  width:12px;height:12px;border-radius:50%;
+  background:#30D158;flex-shrink:0;
+  box-shadow:0 0 8px rgba(48,209,88,0.4);
+  animation:pulse-node 2s ease infinite;
+}
+.node-indicator.offline{background:rgba(245,245,247,0.2);box-shadow:none;animation:none}
+@keyframes pulse-node{0%,100%{box-shadow:0 0 8px rgba(48,209,88,0.4)}50%{box-shadow:0 0 16px rgba(48,209,88,0.6)}}
+.node-info{flex:1}
+.node-name{font-weight:600;font-size:16px;margin-bottom:2px}
+.node-meta{font-size:13px;color:rgba(245,245,247,0.4)}
+.node-model{
+  font-family:'SF Mono','Fira Code',monospace;
+  font-size:12px;color:rgba(10,132,255,0.7);
+  background:rgba(10,132,255,0.1);
+  padding:4px 10px;border-radius:6px;
+}
+.network-health{
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:16px;padding:24px;
+}
+.health-title{font-size:14px;color:rgba(245,245,247,0.4);margin-bottom:16px;text-transform:uppercase;letter-spacing:0.05em}
+.health-bar{
+  height:8px;background:rgba(255,255,255,0.06);
+  border-radius:4px;overflow:hidden;margin-bottom:8px;
+}
+.health-fill{
+  height:100%;border-radius:4px;
+  background:linear-gradient(90deg,#30D158,#0A84FF);
+  transition:width 0.5s ease;
+}
+.health-label{font-size:13px;color:rgba(245,245,247,0.35)}
+
+/* ── Shared ───────────────────────────────────────────────────────────────── */
+.section-divider{
+  height:1px;background:rgba(255,255,255,0.06);
+  margin:48px 0;
+}
+.error-toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  background:rgba(255,69,58,0.15);
+  border:1px solid rgba(255,69,58,0.3);
+  border-radius:12px;padding:12px 24px;
+  font-size:14px;color:#FF453A;
+  z-index:200;
+  animation:fadeSlideUp 0.3s ease;
+  display:none;
+}
+.error-toast.visible{display:block}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+@media(max-width:768px){
+  .nav-tabs{display:none}
+  .nav-hamburger{display:flex}
+  .mobile-menu{display:block}
+  .meet-content{flex-direction:column;padding-top:64px}
+  .meet-face-col{flex:none;align-items:center}
+  .face-container{width:100%;max-width:320px;aspect-ratio:1}
+  .power-modes{flex-direction:column}
+  .power-card{min-width:0}
+  .network-overview{flex-direction:column}
+}
+@media(max-width:480px){
+  #nav{padding:0 16px}
+  .search-bar{padding:14px 52px 14px 20px;font-size:16px}
+  .about-content,.start-content,.connect-content{padding:72px 16px 48px}
+  .meet-content{padding:64px 16px 16px}
+  .result-card{padding:20px}
+}
+@media(min-width:769px){
+  .mobile-menu{display:none!important}
+}
+</style>
+</head>
+<body>
+
+<!-- Stars Background -->
+<canvas id="stars-canvas"></canvas>
+
+<!-- Navigation -->
+<nav id="nav">
+  <div class="nav-logo" onclick="navigateTo('/')">
+    <div class="logo-eyes"><div class="logo-eye"></div><div class="logo-eye"></div></div>
+    <span>Wattson</span>
+  </div>
+  <ul class="nav-tabs">
+    <li class="nav-tab" data-page="about" onclick="navigateTo('/about')">About</li>
+    <li class="nav-tab" data-page="start" onclick="navigateTo('/start')">Get Started</li>
+    <li class="nav-tab" data-page="meet" onclick="navigateTo('/meet')">Meet Wattson</li>
+  </ul>
+  <button class="nav-hamburger" id="hamburger-btn" onclick="toggleMobileMenu()">
+    <div class="hamburger-icon"><span></span><span></span><span></span></div>
+  </button>
+</nav>
+<div class="mobile-menu" id="mobile-menu">
+  <a class="mobile-menu-item" data-page="home" onclick="navigateTo('/');closeMobileMenu()">Home</a>
+  <a class="mobile-menu-item" data-page="about" onclick="navigateTo('/about');closeMobileMenu()">About</a>
+  <a class="mobile-menu-item" data-page="start" onclick="navigateTo('/start');closeMobileMenu()">Get Started</a>
+  <a class="mobile-menu-item" data-page="meet" onclick="navigateTo('/meet');closeMobileMenu()">Meet Wattson</a>
+</div>
+
+<!-- Error Toast -->
+<div class="error-toast" id="error-toast"></div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<main>
+
+<!-- HOME PAGE -->
+<section class="page active visible" id="page-home">
+  <div class="home-logo">Wattson</div>
+  <div class="home-tagline">AI For the World &mdash; Powered by the devices you forgot about.</div>
+  <div class="search-container">
+    <input class="search-bar" id="search-input" type="text" placeholder="Ask anything..." autocomplete="off" maxlength="500" enterkeyhint="search">
+    <div class="search-actions">
+      <button class="search-btn" id="voice-btn" title="Voice search" style="display:none" onclick="toggleVoice()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      </button>
+      <button class="search-btn primary" id="search-submit" title="Search" onclick="submitSearch()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="device-count" id="device-count">Powered by <strong>1</strong> device worldwide</div>
+  <div class="results-area" id="results-area"></div>
+</section>
+
+<!-- ABOUT PAGE -->
+<section class="page" id="page-about">
+  <div class="about-content">
+    <div class="about-hero">
+      <h1>Free AI, Powered by People</h1>
+      <p>A kid in Africa with no ChatGPT can ask a question, and a global network of donated devices answers it.</p>
+    </div>
+    <div class="about-section">
+      <h2>The Mission</h2>
+      <p>AI should be free. Not free as in "free trial" &mdash; actually free. No account, no credit card, no subscription. Just ask and get an answer.</p>
+      <p>Wattson is powered by ordinary devices that people around the world contribute to the network. Old phones, spare laptops, Raspberry Pis &mdash; the devices you forgot about, now doing something that matters.</p>
+    </div>
+    <div class="about-section">
+      <h2>How It Works</h2>
+      <div class="about-diagram">
+        <div class="diagram-flow">
+          <div class="diagram-node">You ask a question</div>
+          <div class="diagram-arrow">&rarr;</div>
+          <div class="diagram-node">wattson.me</div>
+          <div class="diagram-arrow">&rarr;</div>
+          <div class="diagram-node">Nearest available device</div>
+          <div class="diagram-arrow">&rarr;</div>
+          <div class="diagram-node">AI runs locally</div>
+          <div class="diagram-arrow">&rarr;</div>
+          <div class="diagram-node">Answer comes back</div>
+        </div>
+      </div>
+      <p>Every device in the network runs its own AI model using Ollama. When you ask a question, Wattson routes it to the best available device. The AI runs entirely on that device &mdash; no cloud, no data centers, no corporate servers.</p>
+    </div>
+    <div class="about-section">
+      <h2>The Vision</h2>
+      <p>Today, it's one phone answering questions. Tomorrow, it could be a million devices forming a global AI network that belongs to no corporation and serves everyone equally.</p>
+      <ul>
+        <li>Privacy-first: your questions never touch a corporate server</li>
+        <li>Censorship-resistant: no single entity controls the network</li>
+        <li>Always free: powered by volunteers, not investors</li>
+        <li>Open source: every line of code is public</li>
+      </ul>
+    </div>
+    <div class="about-section">
+      <h2>The Technology</h2>
+      <p>Wattson uses <strong>Ollama</strong> to run AI models directly on consumer hardware. Modern small language models can run on almost anything &mdash; a phone with 2GB of RAM can answer your questions.</p>
+      <ul>
+        <li>Zero cloud dependency &mdash; AI runs on the metal</li>
+        <li>Models optimized per device &mdash; from 0.6B parameters (phones) to 70B (desktops)</li>
+        <li>Built-in redundancy &mdash; if one device goes offline, others pick up</li>
+        <li>Zero npm dependencies &mdash; pure Node.js, runs anywhere</li>
+      </ul>
+    </div>
+    <div class="about-footer">
+      <p>Open source on <a href="https://github.com/chatde/wattson-me" target="_blank" rel="noopener">GitHub</a></p>
+      <p style="margin-top:8px">A project by GHB Ventures</p>
+    </div>
+  </div>
+</section>
+
+<!-- START PAGE -->
+<section class="page" id="page-start">
+  <div class="start-content">
+    <div class="start-hero">
+      <h1>Contribute Your Device</h1>
+      <p>Plug it in. Connect it. It contributes. That simple.</p>
+    </div>
+    <h2 class="section-title">Power Modes</h2>
+    <p style="color:rgba(245,245,247,0.5);margin-bottom:24px;font-size:15px">You choose how much to give. Switch anytime.</p>
+    <div class="power-modes">
+      <div class="power-card full">
+        <div class="power-icon">&#9889;</div>
+        <h3>Full Force</h3>
+        <p>Device dedicated 100% to the network. Max model, max context. Best performance.</p>
+        <div class="power-best">Best for: plugged-in phones, old laptops, always-on Pis</div>
+      </div>
+      <div class="power-card half">
+        <div class="power-icon">&#9881;</div>
+        <h3>Half Force</h3>
+        <p>Share resources. Still browse, watch videos. Smaller model, yields to your apps.</p>
+        <div class="power-best">Best for: phone you're still using during the day</div>
+      </div>
+      <div class="power-card eco">
+        <div class="power-icon">&#127807;</div>
+        <h3>Eco Mode</h3>
+        <p>Minimal contribution. Only answers when device is idle. Pauses when you open an app.</p>
+        <div class="power-best">Best for: your daily phone &mdash; no slowdowns</div>
+      </div>
+    </div>
+    <div class="section-divider"></div>
+    <h2 class="section-title">What Can Join?</h2>
+    <div class="device-grid">
+      <div class="device-tag">Android Phones</div>
+      <div class="device-tag">Raspberry Pi (1GB+)</div>
+      <div class="device-tag">Old Laptops</div>
+      <div class="device-tag">Desktops</div>
+      <div class="device-tag">Mac / Linux / Windows</div>
+      <div class="device-tag">Any device with Ollama</div>
+    </div>
+    <div class="section-divider"></div>
+    <h2 class="section-title">Setup Guides</h2>
+    <div class="setup-guides">
+      <div class="setup-item">
+        <div class="setup-header" onclick="toggleSetup(this)">
+          <span>Android (Termux + Ollama)</span>
+          <span class="setup-chevron">&#9660;</span>
+        </div>
+        <div class="setup-body"><div class="setup-body-inner">
+          <p><strong>1.</strong> Install <a href="https://f-droid.org/en/packages/com.termux/" target="_blank" rel="noopener">Termux</a> from F-Droid (not Play Store)</p>
+          <p><strong>2.</strong> Open Termux and run:</p>
+          <pre>pkg update &amp;&amp; pkg install ollama
+ollama serve &amp;</pre>
+          <p><strong>3.</strong> Pull a model for your device:</p>
+          <pre># 2-4GB RAM:
+ollama pull qwen3:1.7b
+
+# Under 2GB RAM:
+ollama pull qwen3:0.6b</pre>
+          <p><strong>4.</strong> Register with the network (coming in Phase 3)</p>
+        </div></div>
+      </div>
+      <div class="setup-item">
+        <div class="setup-header" onclick="toggleSetup(this)">
+          <span>Linux / Raspberry Pi</span>
+          <span class="setup-chevron">&#9660;</span>
+        </div>
+        <div class="setup-body"><div class="setup-body-inner">
+          <p><strong>1.</strong> Install Ollama:</p>
+          <pre>curl -fsSL https://ollama.ai/install.sh | sh</pre>
+          <p><strong>2.</strong> Pull a model:</p>
+          <pre># Pi 3 (1GB): qwen3:0.6b
+# Pi 4 (2-4GB): qwen3:1.7b
+# Laptop (8GB+): llama3.1:8b-q4
+
+ollama pull qwen3:1.7b</pre>
+          <p><strong>3.</strong> Start serving:</p>
+          <pre>ollama serve</pre>
+        </div></div>
+      </div>
+      <div class="setup-item">
+        <div class="setup-header" onclick="toggleSetup(this)">
+          <span>Mac</span>
+          <span class="setup-chevron">&#9660;</span>
+        </div>
+        <div class="setup-body"><div class="setup-body-inner">
+          <p><strong>1.</strong> Install Ollama:</p>
+          <pre>brew install ollama</pre>
+          <p><strong>2.</strong> Pull a model:</p>
+          <pre># 8GB: llama3.1:8b-q4
+# 16GB+: qwen2.5:14b-q4
+ollama pull llama3.1:8b-q4</pre>
+          <p><strong>3.</strong> Ollama runs automatically as a service on Mac.</p>
+        </div></div>
+      </div>
+      <div class="setup-item">
+        <div class="setup-header" onclick="toggleSetup(this)">
+          <span>Windows</span>
+          <span class="setup-chevron">&#9660;</span>
+        </div>
+        <div class="setup-body"><div class="setup-body-inner">
+          <p><strong>1.</strong> Download Ollama from <a href="https://ollama.ai/download" target="_blank" rel="noopener">ollama.ai</a></p>
+          <p><strong>2.</strong> Install and open a terminal (PowerShell or CMD):</p>
+          <pre>ollama pull llama3.1:8b-q4
+ollama serve</pre>
+        </div></div>
+      </div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="faq-section">
+      <h2 class="section-title">FAQ</h2>
+      <div class="faq-item">
+        <h4>Will this slow down my phone?</h4>
+        <p>In Eco Mode, Wattson only works when your phone is idle. You won't notice it. In Full Force, the device is dedicated to the network &mdash; best for phones you're not actively using.</p>
+      </div>
+      <div class="faq-item">
+        <h4>Is my data safe?</h4>
+        <p>Yes. AI runs entirely on the device. Your queries never leave the device that processes them. IP addresses are hashed and never stored in plain text.</p>
+      </div>
+      <div class="faq-item">
+        <h4>What's the minimum device spec?</h4>
+        <p>2GB RAM for phones, 1GB for Raspberry Pi. Any laptop or desktop made in the last 10 years works. The network auto-selects the best model for your hardware.</p>
+      </div>
+      <div class="faq-item">
+        <h4>Can I earn from contributing?</h4>
+        <p>Revenue sharing is planned for Phase 3. Contributors will earn proportional to their uptime and power mode. More contribution = more earnings.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MEET PAGE -->
+<section class="page" id="page-meet">
+  <div class="meet-content">
+    <div class="meet-face-col">
+      <div class="face-container" id="face-container">
+        <canvas id="wattson-face"></canvas>
+        <div class="face-edge-glow" id="face-edge-glow"></div>
+      </div>
+      <div class="meet-stats" id="meet-stats">
+        <div class="stat-badge"><span class="stat-dot" id="stat-dot-ollama"></span><span id="stat-ollama">Checking...</span></div>
+        <div class="stat-badge"><span class="stat-dot offline" id="stat-dot-temp"></span><span id="stat-temp">--</span></div>
+        <div class="stat-badge"><span class="stat-dot offline" id="stat-dot-batt"></span><span id="stat-batt">--</span></div>
+      </div>
+      <div class="meet-thought" id="meet-thought">Waking up...</div>
+    </div>
+    <div class="meet-chat-col">
+      <div class="chat-messages" id="chat-messages">
+        <div class="chat-bubble system">Say hello to Wattson &mdash; an AI that lives on a real phone.</div>
+      </div>
+      <div class="chat-input-area">
+        <input class="chat-input" id="chat-input" type="text" placeholder="Type a message..." maxlength="500" enterkeyhint="send">
+        <button class="chat-send" id="chat-send" onclick="sendChatMessage()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CONNECT PAGE -->
+<section class="page" id="page-connect">
+  <div class="connect-content">
+    <div class="connect-hero">
+      <h1>Network Status</h1>
+      <p>Live view of the Wattson network</p>
+    </div>
+    <div class="network-overview" id="network-overview">
+      <div class="network-stat">
+        <div class="stat-value" id="net-devices">-</div>
+        <div class="stat-label">Devices Online</div>
+      </div>
+      <div class="network-stat">
+        <div class="stat-value" id="net-queries">-</div>
+        <div class="stat-label">Queries Served</div>
+      </div>
+      <div class="network-stat">
+        <div class="stat-value" id="net-version">-</div>
+        <div class="stat-label">Network Version</div>
+      </div>
+    </div>
+    <h2 class="section-title">Active Nodes</h2>
+    <div class="node-list" id="node-list"></div>
+    <div class="network-health">
+      <div class="health-title">Network Health</div>
+      <div class="health-bar"><div class="health-fill" id="health-fill" style="width:0%"></div></div>
+      <div class="health-label" id="health-label">Checking...</div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════════
+   Wattson.me — Single Page Application
+   Zero dependencies. Pure JavaScript.
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+// ── SPA Router ───────────────────────────────────────────────────────────────
+
+var currentPage = 'home';
+var pageMap = { '/': 'home', '/about': 'about', '/start': 'start', '/meet': 'meet', '/connect': 'connect' };
+
+function navigateTo(path) {
+  var pageName = pageMap[path] || 'home';
+  if (pageName === currentPage) return;
+  showPage(pageName);
+  history.pushState({ page: pageName }, '', path);
+}
+
+function showPage(pageName) {
+  // Fade out current
+  var pages = document.querySelectorAll('.page');
+  for (var i = 0; i < pages.length; i++) pages[i].classList.remove('visible');
+
+  setTimeout(function() {
+    for (var j = 0; j < pages.length; j++) pages[j].classList.remove('active');
+    var target = document.getElementById('page-' + pageName);
+    if (target) {
+      target.classList.add('active');
+      requestAnimationFrame(function() { target.classList.add('visible'); });
+    }
+  }, 150);
+
+  currentPage = pageName;
+
+  // Update nav
+  var tabs = document.querySelectorAll('.nav-tab');
+  for (var k = 0; k < tabs.length; k++) {
+    tabs[k].classList.toggle('active', tabs[k].getAttribute('data-page') === pageName);
+  }
+  var mItems = document.querySelectorAll('.mobile-menu-item');
+  for (var m = 0; m < mItems.length; m++) {
+    mItems[m].classList.toggle('active', mItems[m].getAttribute('data-page') === pageName);
+  }
+
+  if (pageName === 'meet') initFace();
+  if (pageName === 'connect') loadNetwork();
+  window.scrollTo(0, 0);
+}
+
+window.addEventListener('popstate', function(e) {
+  var pageName = (e.state && e.state.page) ? e.state.page : pageMap[location.pathname] || 'home';
+  showPage(pageName);
+});
+
+// Init from URL
+(function() {
+  var initial = pageMap[location.pathname] || 'home';
+  currentPage = initial;
+  var pages = document.querySelectorAll('.page');
+  for (var i = 0; i < pages.length; i++) pages[i].classList.remove('active', 'visible');
+  var target = document.getElementById('page-' + initial);
+  if (target) { target.classList.add('active', 'visible'); }
+  var tabs = document.querySelectorAll('.nav-tab');
+  for (var j = 0; j < tabs.length; j++) {
+    tabs[j].classList.toggle('active', tabs[j].getAttribute('data-page') === initial);
+  }
+  history.replaceState({ page: initial }, '', location.pathname);
+  if (initial === 'meet') setTimeout(initFace, 100);
+  if (initial === 'connect') setTimeout(loadNetwork, 100);
+})();
+
+// ── Mobile Menu ──────────────────────────────────────────────────────────────
+
+function toggleMobileMenu() {
+  document.getElementById('hamburger-btn').classList.toggle('open');
+  document.getElementById('mobile-menu').classList.toggle('open');
+}
+function closeMobileMenu() {
+  document.getElementById('hamburger-btn').classList.remove('open');
+  document.getElementById('mobile-menu').classList.remove('open');
+}
+
+// ── Nav Scroll Effect ────────────────────────────────────────────────────────
+
+window.addEventListener('scroll', function() {
+  document.getElementById('nav').classList.toggle('scrolled', window.scrollY > 20);
+}, { passive: true });
+
+// ── Stars Background ─────────────────────────────────────────────────────────
+
+(function() {
+  var canvas = document.getElementById('stars-canvas');
+  var ctx = canvas.getContext('2d');
+  var stars = [];
+  var STAR_COUNT = 150;
+  var dpr = window.devicePixelRatio || 1;
+  var w, h, isVisible = true;
+
+  function resize() {
+    w = window.innerWidth; h = window.innerHeight;
+    canvas.width = w * dpr; canvas.height = h * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function create() {
+    stars = [];
+    for (var i = 0; i < STAR_COUNT; i++) {
+      stars.push({
+        x: Math.random() * w, y: Math.random() * h,
+        size: Math.random() * 1.5 + 0.3,
+        baseOp: Math.random() * 0.6 + 0.15,
+        twSpeed: Math.random() * 1.5 + 0.5,
+        twPhase: Math.random() * Math.PI * 2,
+        dx: (Math.random() - 0.5) * 0.08,
+        dy: (Math.random() - 0.5) * 0.04,
+        hue: Math.random() < 0.15 ? 1 : (Math.random() < 0.3 ? 2 : 0),
+      });
+    }
+  }
+
+  resize(); create();
+  window.addEventListener('resize', function() { resize(); create(); });
+  document.addEventListener('visibilitychange', function() {
+    isVisible = !document.hidden;
+    if (isVisible) requestAnimationFrame(draw);
+  });
+
+  var lastT = performance.now();
+  function draw(ts) {
+    if (!isVisible) return;
+    var dt = (ts - lastT) / 1000; lastT = ts;
+    ctx.clearRect(0, 0, w, h);
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
+      s.twPhase += dt * s.twSpeed;
+      s.x += s.dx * dt; s.y += s.dy * dt;
+      if (s.x < -2) s.x = w + 2; if (s.x > w + 2) s.x = -2;
+      if (s.y < -2) s.y = h + 2; if (s.y > h + 2) s.y = -2;
+      var op = s.baseOp + Math.sin(s.twPhase) * s.baseOp * 0.4;
+      ctx.fillStyle = s.hue === 1 ? 'rgba(255,240,200,' + op.toFixed(3) + ')'
+                    : s.hue === 2 ? 'rgba(180,210,255,' + op.toFixed(3) + ')'
+                    : 'rgba(255,255,255,' + op.toFixed(3) + ')';
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2); ctx.fill();
+    }
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+// ── Search Engine ────────────────────────────────────────────────────────────
+
+var searchHistory = [];
+var isSearching = false;
+var searchInput = document.getElementById('search-input');
+var resultsArea = document.getElementById('results-area');
+
+searchInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitSearch(); }
+});
+
+function submitSearch() {
+  var message = searchInput.value.trim();
+  if (!message || isSearching) return;
+  if (message.length > 500) { showError('Message must be under 500 characters'); return; }
+
+  isSearching = true;
+  document.getElementById('search-submit').disabled = true;
+  document.getElementById('page-home').classList.add('has-results');
+
+  var shimmer = document.createElement('div');
+  shimmer.className = 'loading-shimmer'; shimmer.id = 'loading-shimmer';
+  shimmer.innerHTML = '<div class="shimmer-line"></div><div class="shimmer-line"></div><div class="shimmer-line"></div>';
+  resultsArea.prepend(shimmer);
+
+  var historyForAPI = searchHistory.slice(-6).map(function(h) { return { role: h.role, text: h.text }; });
+
+  fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: message, history: historyForAPI }),
+  })
+  .then(function(res) { return res.json().then(function(d) { return { status: res.status, data: d }; }); })
+  .then(function(r) {
+    var el = document.getElementById('loading-shimmer'); if (el) el.remove();
+    if (r.status !== 200) { showError(r.data.error || 'Something went wrong'); return; }
+
+    searchHistory.push({ role: 'user', text: message });
+    searchHistory.push({ role: 'assistant', text: r.data.response });
+
+    var card = document.createElement('div'); card.className = 'result-card';
+    var qDiv = document.createElement('div'); qDiv.className = 'result-query'; qDiv.textContent = message;
+    var tDiv = document.createElement('div'); tDiv.className = 'result-text';
+    card.appendChild(qDiv); card.appendChild(tDiv);
+    resultsArea.prepend(card);
+    typeWriter(tDiv, r.data.response);
+    searchInput.value = '';
+  })
+  .catch(function() {
+    var el = document.getElementById('loading-shimmer'); if (el) el.remove();
+    showError('Could not reach the network. Try again.');
+  })
+  .finally(function() {
+    isSearching = false;
+    document.getElementById('search-submit').disabled = false;
+    searchInput.focus();
+  });
+}
+
+function typeWriter(el, text, speed) {
+  speed = speed || 20; var i = 0;
+  var cursor = document.createElement('span'); cursor.className = 'cursor';
+  el.textContent = ''; el.appendChild(cursor);
+  function type() {
+    if (i < text.length) { cursor.before(text.charAt(i)); i++; setTimeout(type, speed); }
+    else { setTimeout(function() { cursor.remove(); }, 1500); }
+  }
+  type();
+}
+
+// ── Voice Input ──────────────────────────────────────────────────────────────
+
+var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+var recognition = null, isListening = false;
+
+if (SpeechRecognition) {
+  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  if (!(isIOS && isSafari)) {
+    document.getElementById('voice-btn').style.display = 'flex';
+    recognition = new SpeechRecognition();
+    recognition.continuous = false; recognition.interimResults = false; recognition.lang = 'en-US';
+    recognition.onresult = function(e) { searchInput.value = e.results[0][0].transcript; stopVoice(); submitSearch(); };
+    recognition.onerror = function() { stopVoice(); };
+    recognition.onend = function() { stopVoice(); };
+  }
+}
+
+function toggleVoice() {
+  if (isListening) { stopVoice(); return; }
+  if (!recognition) return;
+  isListening = true; document.getElementById('voice-btn').classList.add('listening');
+  try { recognition.start(); } catch(e) { stopVoice(); }
+}
+function stopVoice() {
+  isListening = false; document.getElementById('voice-btn').classList.remove('listening');
+  if (recognition) try { recognition.stop(); } catch(e) { /* ok */ }
+}
+
+// ── Device Count ─────────────────────────────────────────────────────────────
+
+function loadDeviceCount() {
+  fetch('/api/network').then(function(r) { return r.json(); }).then(function(d) {
+    var c = d.onlineCount || d.deviceCount || 1;
+    document.getElementById('device-count').innerHTML = 'Powered by <strong>' + c + '</strong> device' + (c !== 1 ? 's' : '') + ' worldwide';
+  }).catch(function() {});
+}
+loadDeviceCount();
+
+// ── Face Renderer (Meet Page) ────────────────────────────────────────────────
+
+var faceInited = false, faceCtx = null, faceCanvas = null;
+
+var faceState = {
+  eyeOpen: 0.5, pupilSize: 0.75, mouthCurve: 0.1,
+  eyebrowAngle: 0, sparkle: false, sparkleOpacity: 0,
+  blushIntensity: 0, blinkTimer: 0, isBlinking: false,
+  nextBlink: 3000 + Math.random() * 4000, blinkDuration: 150,
+  lookX: 0, lookY: 0, targetLookX: 0, targetLookY: 0,
+  nextLookChange: 2000 + Math.random() * 5000,
+  breathPhase: 0, talkPhase: 0, talking: false,
+  jitterX: 0, jitterY: 0, sparklePhase: 0,
+  edgeR: 70, edgeG: 130, edgeB: 255, edgePulseSpeed: 1,
+  edgePulsePhase: 0, lastTime: 0,
+};
+
+function initFace() {
+  if (faceInited) return;
+  faceCanvas = document.getElementById('wattson-face');
+  if (!faceCanvas) return;
+  faceCtx = faceCanvas.getContext('2d');
+  faceInited = true;
+
+  var container = document.getElementById('face-container');
+  function resizeFace() {
+    var rect = container.getBoundingClientRect();
+    var dpr = window.devicePixelRatio || 1;
+    faceCanvas.width = rect.width * dpr;
+    faceCanvas.height = rect.height * dpr;
+    faceCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  resizeFace();
+  window.addEventListener('resize', resizeFace);
+
+  container.addEventListener('mousemove', function(e) {
+    var rect = container.getBoundingClientRect();
+    faceState.targetLookX = ((e.clientX - rect.left) - rect.width / 2) / (rect.width / 2);
+    faceState.targetLookY = ((e.clientY - rect.top) - rect.height * 0.42) / (rect.height * 0.42);
+    faceState.nextLookChange = 2000;
+  });
+  container.addEventListener('mouseleave', function() {
+    faceState.targetLookX = 0; faceState.targetLookY = 0;
+  });
+  container.addEventListener('click', function() {
+    faceState.eyeOpen = 1.0; faceState.pupilSize = 1.1; faceState.mouthCurve = 0.3;
+    faceState.sparkle = true;
+    setTimeout(function() { faceState.sparkle = false; }, 2000);
+  });
+
+  faceState.lastTime = performance.now();
+  requestAnimationFrame(drawFace);
+  pollMeetState();
+  setInterval(pollMeetState, 3000);
+}
+
+function lerp(a, b, t) { return a + (b - a) * Math.min(1, t); }
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function drawFaceEye(cx, cy, r, open, pupilS, lx, ly, jx, jy, sparkOp) {
+  var eyeH = r * Math.max(0.02, open), eyeW = r;
+
+  faceCtx.save();
+  faceCtx.beginPath();
+  faceCtx.ellipse(cx, cy, eyeW, eyeH, 0, 0, Math.PI * 2);
+  faceCtx.fillStyle = 'rgba(230,235,240,' + (0.9 + open * 0.1).toFixed(2) + ')';
+  faceCtx.fill(); faceCtx.clip();
+
+  var pr = r * 0.45 * pupilS, mo = r * 0.25;
+  var px = cx + (lx + jx) * mo, py = cy + (ly + jy) * mo;
+  var ir = pr * 1.6;
+
+  var ig = faceCtx.createRadialGradient(px, py, pr * 0.3, px, py, ir);
+  ig.addColorStop(0, '#2a5a8a'); ig.addColorStop(0.6, '#1a3a5a'); ig.addColorStop(1, '#0d2030');
+  faceCtx.beginPath(); faceCtx.arc(px, py, ir, 0, Math.PI * 2); faceCtx.fillStyle = ig; faceCtx.fill();
+
+  faceCtx.beginPath(); faceCtx.arc(px, py, pr, 0, Math.PI * 2);
+  faceCtx.fillStyle = '#050510'; faceCtx.fill();
+
+  faceCtx.beginPath(); faceCtx.arc(px - pr * 0.3, py - pr * 0.35, pr * 0.25, 0, Math.PI * 2);
+  faceCtx.fillStyle = 'rgba(255,255,255,0.7)'; faceCtx.fill();
+
+  if (sparkOp > 0.01) {
+    var sps = [{ a: -0.8, d: 0.55, s: 0.12 }, { a: 1.8, d: 0.7, s: 0.09 }, { a: 2.8, d: 0.45, s: 0.1 }];
+    for (var i = 0; i < sps.length; i++) {
+      faceCtx.beginPath();
+      faceCtx.arc(px + Math.cos(sps[i].a) * ir * sps[i].d, py + Math.sin(sps[i].a) * ir * sps[i].d, pr * sps[i].s, 0, Math.PI * 2);
+      faceCtx.fillStyle = 'rgba(255,255,255,' + (sparkOp * 0.85).toFixed(3) + ')'; faceCtx.fill();
+    }
+  }
+  faceCtx.restore();
+
+  faceCtx.beginPath();
+  faceCtx.ellipse(cx, cy - eyeH * 0.05, eyeW * 1.05, eyeH * 0.15, 0, Math.PI, 0);
+  faceCtx.strokeStyle = 'rgba(200,210,220,0.3)'; faceCtx.lineWidth = 2; faceCtx.stroke();
+}
+
+function drawFaceEyebrow(cx, cy, er, angle, isLeft) {
+  var bw = er * 1.15, bh = er * 0.22, yo = -er * 1.25;
+  var ix = isLeft ? cx + bw * 0.5 : cx - bw * 0.5;
+  var ox = isLeft ? cx - bw * 0.5 : cx + bw * 0.5;
+  var by = cy + yo, iy = by - angle * bh * 2.5, oy = by + angle * bh * 0.5;
+  faceCtx.beginPath(); faceCtx.moveTo(ox, oy);
+  faceCtx.quadraticCurveTo((ix + ox) / 2, Math.min(iy, oy) - bh * 0.8, ix, iy);
+  faceCtx.strokeStyle = 'rgba(200,210,225,0.45)';
+  faceCtx.lineWidth = er * 0.08; faceCtx.lineCap = 'round'; faceCtx.stroke();
+}
+
+function drawFaceMouth(cx, cy, w, curve, talkOpen) {
+  var hw = w / 2;
+  if (talkOpen > 0.05) {
+    var oh = talkOpen * w * 0.25, cp = cy + curve * w * 0.4;
+    faceCtx.beginPath(); faceCtx.moveTo(cx - hw, cy);
+    faceCtx.quadraticCurveTo(cx, cp - oh, cx + hw, cy);
+    faceCtx.quadraticCurveTo(cx, cp + oh, cx - hw, cy);
+    faceCtx.fillStyle = 'rgba(30,20,40,0.8)'; faceCtx.fill();
+    faceCtx.strokeStyle = 'rgba(200,180,200,0.6)'; faceCtx.lineWidth = 2.5; faceCtx.stroke();
+  } else {
+    faceCtx.beginPath(); faceCtx.moveTo(cx - hw, cy);
+    faceCtx.quadraticCurveTo(cx, cy + curve * w * 0.4, cx + hw, cy);
+    faceCtx.strokeStyle = 'rgba(200,180,200,0.6)'; faceCtx.lineWidth = 3; faceCtx.stroke();
+  }
+}
+
+function drawFace(ts) {
+  if (!faceInited || currentPage !== 'meet') {
+    if (faceInited) requestAnimationFrame(drawFace);
+    return;
+  }
+
+  var dt = ts - faceState.lastTime; faceState.lastTime = ts;
+  var dtS = dt / 1000; if (dtS > 0.1) dtS = 0.016;
+
+  var container = document.getElementById('face-container');
+  if (!container) { requestAnimationFrame(drawFace); return; }
+  var rect = container.getBoundingClientRect();
+  var w = rect.width, h = rect.height;
+
+  var ls = 3 * dtS;
+  faceState.eyeOpen = lerp(faceState.eyeOpen, 0.55, ls);
+  faceState.pupilSize = lerp(faceState.pupilSize, clamp(0.8, 0.5, 1.5), ls);
+  faceState.mouthCurve = lerp(faceState.mouthCurve, 0.1, ls);
+  faceState.eyebrowAngle = lerp(faceState.eyebrowAngle, 0, 2 * dtS);
+  faceState.sparkleOpacity = lerp(faceState.sparkleOpacity, faceState.sparkle ? 1 : 0, 2 * dtS);
+
+  // Blink
+  faceState.blinkTimer += dt;
+  if (!faceState.isBlinking && faceState.blinkTimer > faceState.nextBlink) {
+    faceState.isBlinking = true; faceState.blinkTimer = 0;
+  }
+  if (faceState.isBlinking && faceState.blinkTimer > faceState.blinkDuration) {
+    faceState.isBlinking = false; faceState.blinkTimer = 0;
+    faceState.nextBlink = 2500 + Math.random() * 5000;
+  }
+  var blinkMod = faceState.isBlinking ? Math.max(0, 1 - Math.sin(faceState.blinkTimer / faceState.blinkDuration * Math.PI)) : 1;
+
+  // Look
+  faceState.nextLookChange -= dt;
+  if (faceState.nextLookChange <= 0) {
+    faceState.targetLookX = (Math.random() - 0.5) * 1.5;
+    faceState.targetLookY = (Math.random() - 0.5) * 0.8;
+    faceState.nextLookChange = 1500 + Math.random() * 4000;
+  }
+  faceState.lookX = lerp(faceState.lookX, faceState.targetLookX, 2 * dtS);
+  faceState.lookY = lerp(faceState.lookY, faceState.targetLookY, 2 * dtS);
+
+  faceState.breathPhase += dtS * 1.2;
+  faceState.talkPhase += dtS * 12;
+  var talkOpen = faceState.talking ? 0.3 + Math.sin(faceState.talkPhase) * 0.3 + Math.sin(faceState.talkPhase * 2.7) * 0.15 : 0;
+  faceState.jitterX = (Math.random() - 0.5) * 0.04;
+  faceState.jitterY = (Math.random() - 0.5) * 0.04;
+  faceState.sparklePhase += dtS * 4;
+  var sparkFlicker = 0.5 + 0.5 * Math.sin(faceState.sparklePhase * 2.3) * Math.cos(faceState.sparklePhase * 1.7);
+
+  faceCtx.fillStyle = '#080810'; faceCtx.fillRect(0, 0, w, h);
+
+  var unit = Math.min(w, h) * 0.14;
+  var faceCX = w / 2, faceCY = h * 0.42;
+  var eyeSpacing = unit * 1.6, eyeR = unit * 0.75;
+  var breathScale = 1 + Math.sin(faceState.breathPhase) * 0.008;
+
+  faceCtx.save();
+  faceCtx.translate(faceCX, faceCY);
+  faceCtx.scale(breathScale, breathScale);
+  faceCtx.translate(-faceCX, -faceCY);
+
+  // Glow
+  var glowR = unit * (1.8 + Math.sin(faceState.breathPhase) * 0.15);
+  var gg = faceCtx.createRadialGradient(faceCX, faceCY, unit * 0.5, faceCX, faceCY, glowR);
+  gg.addColorStop(0, 'rgba(' + Math.round(faceState.edgeR) + ',' + Math.round(faceState.edgeG) + ',' + Math.round(faceState.edgeB) + ',0.06)');
+  gg.addColorStop(1, 'rgba(8,8,16,0)');
+  faceCtx.beginPath(); faceCtx.arc(faceCX, faceCY, glowR, 0, Math.PI * 2);
+  faceCtx.fillStyle = gg; faceCtx.fill();
+
+  var lx = faceCX - eyeSpacing / 2, rx = faceCX + eyeSpacing / 2;
+  var eOpen = faceState.eyeOpen * blinkMod;
+  var sOp = faceState.sparkleOpacity * sparkFlicker;
+
+  drawFaceEyebrow(lx, faceCY, eyeR, faceState.eyebrowAngle, true);
+  drawFaceEyebrow(rx, faceCY, eyeR, faceState.eyebrowAngle, false);
+  drawFaceEye(lx, faceCY, eyeR, eOpen, faceState.pupilSize, faceState.lookX, faceState.lookY, faceState.jitterX, faceState.jitterY, sOp);
+  drawFaceEye(rx, faceCY, eyeR, eOpen, faceState.pupilSize, faceState.lookX, faceState.lookY, faceState.jitterX, faceState.jitterY, sOp);
+
+  var mouthY = faceCY + unit * 1.3;
+  drawFaceMouth(faceCX, mouthY, unit * 1.4, faceState.mouthCurve, talkOpen);
+
+  faceCtx.restore();
+
+  // Edge glow
+  faceState.edgePulsePhase += dtS * faceState.edgePulseSpeed * Math.PI * 2;
+  var ep = 0.1 + 0.15 * (0.5 + 0.5 * Math.sin(faceState.edgePulsePhase));
+  var eGlow = document.getElementById('face-edge-glow');
+  if (eGlow) eGlow.style.boxShadow = 'inset 0 0 25px 15px rgba(' + Math.round(faceState.edgeR) + ',' + Math.round(faceState.edgeG) + ',' + Math.round(faceState.edgeB) + ',' + ep.toFixed(3) + ')';
+
+  requestAnimationFrame(drawFace);
+}
+
+// ── Meet State Polling ───────────────────────────────────────────────────────
+
+function pollMeetState() {
+  if (currentPage !== 'meet') return;
+  fetch('/api/state').then(function(r) { return r.json(); }).then(function(d) {
+    if (d.expression) {
+      if (d.expression.eyeOpen !== undefined) faceState.eyeOpen = d.expression.eyeOpen;
+      if (d.expression.pupilSize !== undefined) faceState.pupilSize = d.expression.pupilSize;
+      if (d.expression.mouthCurve !== undefined) faceState.mouthCurve = d.expression.mouthCurve;
+      if (d.expression.eyebrowAngle !== undefined) faceState.eyebrowAngle = d.expression.eyebrowAngle;
+      if (d.expression.sparkle !== undefined) faceState.sparkle = d.expression.sparkle;
+      if (d.expression.edgeColor) {
+        faceState.edgeR = d.expression.edgeColor.r;
+        faceState.edgeG = d.expression.edgeColor.g;
+        faceState.edgeB = d.expression.edgeColor.b;
+      }
+    }
+    var dotO = document.getElementById('stat-dot-ollama');
+    if (d.ollamaAlive !== undefined) {
+      dotO.className = 'stat-dot' + (d.ollamaAlive ? '' : ' danger');
+      document.getElementById('stat-ollama').textContent = d.ollamaAlive ? 'Online' : 'Offline';
+    }
+    if (d.temp !== undefined) {
+      document.getElementById('stat-dot-temp').className = 'stat-dot' + (d.temp > 60 ? ' danger' : d.temp > 45 ? ' warn' : '');
+      document.getElementById('stat-temp').textContent = Math.round(d.temp * 9/5 + 32) + 'F';
+    }
+    if (d.battery !== undefined) {
+      document.getElementById('stat-dot-batt').className = 'stat-dot' + (d.battery < 20 ? ' danger' : '');
+      document.getElementById('stat-batt').textContent = d.battery + '%';
+    }
+    if (d.lastThought && d.lastThought.text) document.getElementById('meet-thought').textContent = d.lastThought.text;
+  }).catch(function() {
+    document.getElementById('stat-dot-ollama').className = 'stat-dot offline';
+    document.getElementById('stat-ollama').textContent = 'Checking...';
+  });
+}
+
+// ── Chat (Meet Page) ─────────────────────────────────────────────────────────
+
+var chatHistory = [], isChatting = false;
+var chatInput = document.getElementById('chat-input');
+var chatMessages = document.getElementById('chat-messages');
+
+chatInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
+});
+
+function sendChatMessage() {
+  var msg = chatInput.value.trim();
+  if (!msg || isChatting) return;
+  if (msg.length > 500) { showError('Message must be under 500 characters'); return; }
+
+  isChatting = true;
+  document.getElementById('chat-send').disabled = true;
+  chatInput.value = '';
+
+  var ub = document.createElement('div'); ub.className = 'chat-bubble user'; ub.textContent = msg;
+  chatMessages.appendChild(ub); scrollChat();
+
+  faceState.talking = true; faceState.eyeOpen = 0.8; faceState.pupilSize = 0.9;
+
+  var hApi = chatHistory.slice(-6).map(function(h) { return { role: h.role, text: h.text }; });
+
+  fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: msg, history: hApi }),
+  })
+  .then(function(r) { return r.json().then(function(d) { return { status: r.status, data: d }; }); })
+  .then(function(r) {
+    faceState.talking = false;
+    if (r.status !== 200) {
+      var eb = document.createElement('div'); eb.className = 'chat-bubble system';
+      eb.textContent = r.data.error || 'Something went wrong';
+      chatMessages.appendChild(eb); scrollChat(); return;
+    }
+    chatHistory.push({ role: 'user', text: msg });
+    chatHistory.push({ role: 'assistant', text: r.data.response });
+    faceState.mouthCurve = 0.25; faceState.eyeOpen = 0.7;
+
+    var bb = document.createElement('div'); bb.className = 'chat-bubble assistant';
+    chatMessages.appendChild(bb);
+    typeWriter(bb, r.data.response, 15);
+    scrollChat();
+  })
+  .catch(function() {
+    faceState.talking = false;
+    var eb = document.createElement('div'); eb.className = 'chat-bubble system';
+    eb.textContent = 'Could not reach Wattson. Try again.';
+    chatMessages.appendChild(eb); scrollChat();
+  })
+  .finally(function() {
+    isChatting = false;
+    document.getElementById('chat-send').disabled = false;
+    chatInput.focus();
+  });
+}
+
+function scrollChat() {
+  setTimeout(function() { chatMessages.scrollTop = chatMessages.scrollHeight; }, 50);
+}
+
+// ── Network / Connect Page ───────────────────────────────────────────────────
+
+function loadNetwork() {
+  fetch('/api/network').then(function(r) { return r.json(); }).then(function(d) {
+    document.getElementById('net-devices').textContent = d.onlineCount || 0;
+    document.getElementById('net-queries').textContent = d.totalQueries || 0;
+    document.getElementById('net-version').textContent = d.networkVersion || '-';
+
+    var nl = document.getElementById('node-list'); nl.innerHTML = '';
+    var nodes = d.nodes || [];
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      var c = document.createElement('div'); c.className = 'node-card';
+      c.innerHTML = '<div class="node-indicator' + (n.status !== 'online' ? ' offline' : '') + '"></div>' +
+        '<div class="node-info"><div class="node-name">' + esc(n.name) + '</div>' +
+        '<div class="node-meta">' + esc(n.type) + ' &middot; ' + esc(n.powerMode || 'FULL_FORCE') +
+        (n.specs ? ' &middot; ' + esc(n.specs.ram || '') : '') + '</div></div>' +
+        '<div class="node-model">' + esc(n.model || '-') + '</div>';
+      nl.appendChild(c);
+    }
+
+    var on = d.onlineCount || 0, tot = d.deviceCount || 1;
+    var pct = Math.round((on / tot) * 100);
+    document.getElementById('health-fill').style.width = pct + '%';
+    var hl = pct === 100 ? 'OPTIMAL' : pct >= 60 ? 'HEALTHY' : pct >= 40 ? 'DEGRADED' : 'CRITICAL';
+    document.getElementById('health-label').textContent = on + '/' + tot + ' nodes online — ' + hl;
+  }).catch(function() {
+    document.getElementById('health-label').textContent = 'Could not reach network';
+  });
+}
+
+// ── Utilities ────────────────────────────────────────────────────────────────
+
+function esc(s) {
+  if (typeof s !== 'string') return '';
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function showError(msg) {
+  var t = document.getElementById('error-toast');
+  t.textContent = msg; t.classList.add('visible');
+  setTimeout(function() { t.classList.remove('visible'); }, 4000);
+}
+
+function toggleSetup(header) {
+  var item = header.parentElement;
+  var body = item.querySelector('.setup-body');
+  var isOpen = item.classList.contains('open');
+  var all = document.querySelectorAll('.setup-item');
+  for (var i = 0; i < all.length; i++) {
+    all[i].classList.remove('open');
+    all[i].querySelector('.setup-body').style.maxHeight = '0';
+  }
+  if (!isOpen) { item.classList.add('open'); body.style.maxHeight = body.scrollHeight + 'px'; }
+}
+</script>
+</body>
+</html>
