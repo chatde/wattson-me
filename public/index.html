@@ -67,10 +67,10 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
   background:radial-gradient(circle at 40% 40%,#5dade2 0%,#1a5276 100%);
   box-shadow:0 0 6px rgba(52,152,219,0.5);
 }
-.nav-tabs{display:flex;gap:4px;list-style:none}
+.nav-tabs{display:flex;gap:2px;list-style:none;overflow:hidden}
 .nav-tab{
-  padding:8px 16px;border-radius:20px;
-  font-size:14px;font-weight:500;
+  padding:8px 12px;border-radius:20px;
+  font-size:13px;font-weight:500;white-space:nowrap;
   color:rgba(245,245,247,0.6);
   transition:all 0.2s ease;
   cursor:pointer;
@@ -118,17 +118,17 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 /* ── Page Container ───────────────────────────────────────────────────────── */
 main{position:relative;z-index:1;min-height:100vh;min-height:100dvh}
 .page{
-  display:none;opacity:0;
+  display:none!important;opacity:0;
   transition:opacity 0.3s ease;
   padding-top:56px;
   padding-bottom:env(safe-area-inset-bottom,0);
 }
-.page.active{display:block}
+.page.active{display:block!important}
 .page.visible{opacity:1}
 
 /* ── HOME PAGE ────────────────────────────────────────────────────────────── */
-#page-home{
-  display:flex;flex-direction:column;align-items:center;
+#page-home.active{
+  display:flex!important;flex-direction:column;align-items:center;
   justify-content:center;
   min-height:100vh;min-height:100dvh;
   padding:56px 24px env(safe-area-inset-bottom,24px);
@@ -815,22 +815,22 @@ main{position:relative;z-index:1;min-height:100vh;min-height:100dvh}
         <div class="diagram-flow">
           <div class="diagram-node">You ask a question</div>
           <div class="diagram-arrow">&rarr;</div>
-          <div class="diagram-node">wattson.me</div>
-          <div class="diagram-arrow">&rarr;</div>
-          <div class="diagram-node">Nearest available device</div>
+          <div class="diagram-node">wattson.me (job queue)</div>
+          <div class="diagram-arrow">&larr;</div>
+          <div class="diagram-node">Device picks it up</div>
           <div class="diagram-arrow">&rarr;</div>
           <div class="diagram-node">AI runs locally</div>
           <div class="diagram-arrow">&rarr;</div>
           <div class="diagram-node">Answer comes back</div>
         </div>
       </div>
-      <p>Every device in the network runs its own AI model using Ollama. When you ask a question, Wattson routes it to the best available device. The AI runs entirely on that device &mdash; no cloud, no data centers, no corporate servers.</p>
+      <p>Every device in the network runs its own AI model using Ollama. When you ask a question, it goes into a queue. Contributor devices poll for new questions, process them on their local hardware, and send the answer back. The AI runs entirely on volunteer devices &mdash; no cloud, no data centers, no corporate servers.</p>
     </div>
     <div class="about-section">
       <h2>The Vision</h2>
       <p>Today, it's one phone answering questions. Tomorrow, it could be a million devices forming a global AI network that belongs to no corporation and serves everyone equally.</p>
       <ul>
-        <li>Privacy-first: your questions never touch a corporate server</li>
+        <li>Privacy-first: no corporate servers, no data collection, no tracking</li>
         <li>Censorship-resistant: no single entity controls the network</li>
         <li>Always free: powered by volunteers, not investors</li>
         <li>Open source: every line of code is public</li>
@@ -911,7 +911,17 @@ ollama pull qwen3:1.7b
 
 # Under 2GB RAM:
 ollama pull qwen3:0.6b</pre>
-          <p><strong>4.</strong> Register with the network (coming in Phase 3)</p>
+          <p><strong>4.</strong> Download and run the contributor client:</p>
+          <pre># Download the client
+curl -O https://raw.githubusercontent.com/chatde/wattson-me/main/wattson-client.js
+
+# Run it (replace YOUR_TOKEN with your token)
+WATTSON_SERVER=https://wattson.me \
+NODE_SECRET=YOUR_TOKEN \
+MODEL=qwen3:1.7b \
+node wattson-client.js</pre>
+          <p>The client registers your device, polls for questions, runs them on your local Ollama, and sends answers back. It runs until you stop it (Ctrl+C).</p>
+          <p>Don't have a token? <a href="https://github.com/chatde/wattson-me/issues" target="_blank" rel="noopener">Request one here</a>.</p>
         </div></div>
       </div>
       <div class="setup-item">
@@ -928,8 +938,17 @@ ollama pull qwen3:0.6b</pre>
 # Laptop (8GB+): llama3.1:8b-q4
 
 ollama pull qwen3:1.7b</pre>
-          <p><strong>3.</strong> Start serving:</p>
-          <pre>ollama serve</pre>
+          <p><strong>3.</strong> Download and run the contributor client:</p>
+          <pre># Download the client
+curl -O https://raw.githubusercontent.com/chatde/wattson-me/main/wattson-client.js
+
+# Run it (replace YOUR_TOKEN with your token)
+WATTSON_SERVER=https://wattson.me \
+NODE_SECRET=YOUR_TOKEN \
+MODEL=qwen3:1.7b \
+node wattson-client.js</pre>
+          <p>The client handles everything: registration, polling for questions, running Ollama, and sending answers back.</p>
+          <p>Don't have a token? <a href="https://github.com/chatde/wattson-me/issues" target="_blank" rel="noopener">Request one here</a>.</p>
         </div></div>
       </div>
       <div class="setup-item">
@@ -944,7 +963,17 @@ ollama pull qwen3:1.7b</pre>
           <pre># 8GB: llama3.1:8b-q4
 # 16GB+: qwen2.5:14b-q4
 ollama pull llama3.1:8b-q4</pre>
-          <p><strong>3.</strong> Ollama runs automatically as a service on Mac.</p>
+          <p><strong>3.</strong> Download and run the contributor client:</p>
+          <pre># Download the client
+curl -O https://raw.githubusercontent.com/chatde/wattson-me/main/wattson-client.js
+
+# Run it (replace YOUR_TOKEN with your token)
+WATTSON_SERVER=https://wattson.me \
+NODE_SECRET=YOUR_TOKEN \
+MODEL=llama3.1:8b-q4 \
+node wattson-client.js</pre>
+          <p>The client handles everything: registration, polling for questions, running Ollama, and sending answers back.</p>
+          <p>Don't have a token? <a href="https://github.com/chatde/wattson-me/issues" target="_blank" rel="noopener">Request one here</a>.</p>
         </div></div>
       </div>
       <div class="setup-item">
@@ -954,9 +983,19 @@ ollama pull llama3.1:8b-q4</pre>
         </div>
         <div class="setup-body"><div class="setup-body-inner">
           <p><strong>1.</strong> Download Ollama from <a href="https://ollama.ai/download" target="_blank" rel="noopener">ollama.ai</a></p>
-          <p><strong>2.</strong> Install and open a terminal (PowerShell or CMD):</p>
-          <pre>ollama pull llama3.1:8b-q4
-ollama serve</pre>
+          <p><strong>2.</strong> Install and open a terminal (PowerShell):</p>
+          <pre>ollama pull llama3.1:8b-q4</pre>
+          <p><strong>3.</strong> Download and run the contributor client:</p>
+          <pre># Download the client
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/chatde/wattson-me/main/wattson-client.js" -OutFile "wattson-client.js"
+
+# Run it (replace YOUR_TOKEN with your token)
+$env:WATTSON_SERVER="https://wattson.me"
+$env:NODE_SECRET="YOUR_TOKEN"
+$env:MODEL="llama3.1:8b-q4"
+node wattson-client.js</pre>
+          <p>The client handles everything: registration, polling for questions, running Ollama, and sending answers back.</p>
+          <p>Don't have a token? <a href="https://github.com/chatde/wattson-me/issues" target="_blank" rel="noopener">Request one here</a>.</p>
         </div></div>
       </div>
     </div>
@@ -969,7 +1008,7 @@ ollama serve</pre>
       </div>
       <div class="faq-item">
         <h4>Is my data safe?</h4>
-        <p>Yes. AI runs entirely on the device. Your queries never leave the device that processes them. IP addresses are hashed and never stored in plain text.</p>
+        <p>Yes. Your query travels to a volunteer's device for processing, then disappears. We use Fog Logging &mdash; we record that a conversation happened (how long, what topic), but the actual words are never stored. No accounts, no tracking. IP addresses are hashed and never stored in plain text.</p>
       </div>
       <div class="faq-item">
         <h4>What's the minimum device spec?</h4>
@@ -992,11 +1031,9 @@ ollama serve</pre>
         <div class="face-edge-glow" id="face-edge-glow"></div>
       </div>
       <div class="meet-stats" id="meet-stats">
-        <div class="stat-badge"><span class="stat-dot" id="stat-dot-ollama"></span><span id="stat-ollama">Checking...</span></div>
-        <div class="stat-badge"><span class="stat-dot offline" id="stat-dot-temp"></span><span id="stat-temp">--</span></div>
-        <div class="stat-badge"><span class="stat-dot offline" id="stat-dot-batt"></span><span id="stat-batt">--</span></div>
+        <div class="stat-badge"><span class="stat-dot" id="stat-dot-network"></span><span id="stat-network">Checking...</span></div>
       </div>
-      <div class="meet-thought" id="meet-thought">Waking up...</div>
+      <div class="meet-thought" id="meet-thought">Powered by volunteers around the world.</div>
     </div>
     <div class="meet-chat-col">
       <div class="chat-messages" id="chat-messages">
@@ -1060,8 +1097,8 @@ ollama serve</pre>
         <div class="stat-label">Inference Online</div>
       </div>
       <div class="dash-stat">
-        <div class="stat-value" id="dash-monitor-online">-</div>
-        <div class="stat-label">Monitors Online</div>
+        <div class="stat-value" id="dash-pending-jobs">-</div>
+        <div class="stat-label">Pending Jobs</div>
       </div>
       <div class="dash-stat">
         <div class="stat-value" id="dash-total-queries">-</div>
@@ -1078,9 +1115,7 @@ ollama serve</pre>
             <th>Role</th>
             <th>Queries</th>
             <th>Avg Response</th>
-            <th>Latency</th>
-            <th>Failures</th>
-            <th>Last Check</th>
+            <th>Last Seen</th>
           </tr>
         </thead>
         <tbody id="dash-table-body"></tbody>
@@ -1576,36 +1611,19 @@ function drawFace(ts) {
 
 function pollMeetState() {
   if (currentPage !== 'meet') return;
-  fetch('/api/state').then(function(r) { return r.json(); }).then(function(d) {
-    if (d.expression) {
-      if (d.expression.eyeOpen !== undefined) faceState.eyeOpen = d.expression.eyeOpen;
-      if (d.expression.pupilSize !== undefined) faceState.pupilSize = d.expression.pupilSize;
-      if (d.expression.mouthCurve !== undefined) faceState.mouthCurve = d.expression.mouthCurve;
-      if (d.expression.eyebrowAngle !== undefined) faceState.eyebrowAngle = d.expression.eyebrowAngle;
-      if (d.expression.sparkle !== undefined) faceState.sparkle = d.expression.sparkle;
-      if (d.expression.edgeColor) {
-        faceState.edgeR = d.expression.edgeColor.r;
-        faceState.edgeG = d.expression.edgeColor.g;
-        faceState.edgeB = d.expression.edgeColor.b;
-      }
+  fetch('/health').then(function(r) { return r.json(); }).then(function(d) {
+    var dot = document.getElementById('stat-dot-network');
+    var label = document.getElementById('stat-network');
+    if (d.inferenceOnline > 0) {
+      dot.className = 'stat-dot';
+      label.textContent = d.inferenceOnline + ' node' + (d.inferenceOnline !== 1 ? 's' : '') + ' online';
+    } else {
+      dot.className = 'stat-dot offline';
+      label.textContent = 'No nodes online';
     }
-    var dotO = document.getElementById('stat-dot-ollama');
-    if (d.ollamaAlive !== undefined) {
-      dotO.className = 'stat-dot' + (d.ollamaAlive ? '' : ' danger');
-      document.getElementById('stat-ollama').textContent = d.ollamaAlive ? 'Online' : 'Offline';
-    }
-    if (d.temp !== undefined) {
-      document.getElementById('stat-dot-temp').className = 'stat-dot' + (d.temp > 60 ? ' danger' : d.temp > 45 ? ' warn' : '');
-      document.getElementById('stat-temp').textContent = Math.round(d.temp * 9/5 + 32) + 'F';
-    }
-    if (d.battery !== undefined) {
-      document.getElementById('stat-dot-batt').className = 'stat-dot' + (d.battery < 20 ? ' danger' : '');
-      document.getElementById('stat-batt').textContent = d.battery + '%';
-    }
-    if (d.lastThought && d.lastThought.text) document.getElementById('meet-thought').textContent = d.lastThought.text;
   }).catch(function() {
-    document.getElementById('stat-dot-ollama').className = 'stat-dot offline';
-    document.getElementById('stat-ollama').textContent = 'Checking...';
+    document.getElementById('stat-dot-network').className = 'stat-dot offline';
+    document.getElementById('stat-network').textContent = 'Checking...';
   });
 }
 
@@ -1722,7 +1740,7 @@ function fetchDashboard() {
   fetch('/api/network').then(function(r) { return r.json(); }).then(function(d) {
     document.getElementById('dash-total-nodes').textContent = d.deviceCount || 0;
     document.getElementById('dash-inference-online').textContent = (d.inferenceOnline || 0) + '/' + (d.inferenceCount || 0);
-    document.getElementById('dash-monitor-online').textContent = (d.monitorOnline || 0) + '/' + (d.monitorCount || 0);
+    document.getElementById('dash-pending-jobs').textContent = (d.pendingJobs || 0) + (d.processingJobs ? '+' + d.processingJobs : '');
     document.getElementById('dash-total-queries').textContent = d.totalQueries || 0;
     document.getElementById('dash-version').textContent = d.networkVersion || '-';
 
@@ -1739,18 +1757,15 @@ function fetchDashboard() {
       var statusCls = n.status === 'online' ? 'online' : 'offline';
       var roleCls = n.role || 'inference';
       var qPct = maxQ > 0 ? Math.round(((n.queriesServed || 0) / maxQ) * 100) : 0;
-      var lastCheck = n.lastHealthCheck ? timeAgo(n.lastHealthCheck) : 'Never';
+      var lastSeen = n.lastSeen ? timeAgo(n.lastSeen) : 'Never';
       var avgMs = n.averageResponseMs ? n.averageResponseMs + 'ms' : '-';
-      var latMs = n.latencyMs != null ? n.latencyMs + 'ms' : '-';
       tr.innerHTML =
         '<td><span class="dash-status-dot ' + statusCls + '"></span></td>' +
         '<td><strong>' + esc(n.name) + '</strong><br><span style="font-size:12px;color:rgba(245,245,247,0.35)">' + esc(n.type || '') + '</span></td>' +
         '<td><span class="role-badge ' + roleCls + '">' + esc(roleCls) + '</span></td>' +
         '<td><div class="query-bar-wrap"><div class="query-bar" style="width:' + qPct + '%"></div></div>' + (n.queriesServed || 0) + '</td>' +
         '<td>' + avgMs + '</td>' +
-        '<td>' + latMs + '</td>' +
-        '<td>' + (n.failureCount || 0) + '</td>' +
-        '<td style="font-size:12px;color:rgba(245,245,247,0.35)">' + lastCheck + '</td>';
+        '<td style="font-size:12px;color:rgba(245,245,247,0.35)">' + lastSeen + '</td>';
       tbody.appendChild(tr);
     }
   }).catch(function() {

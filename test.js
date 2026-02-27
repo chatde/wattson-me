@@ -1,12 +1,11 @@
 #!/usr/bin/env node
-// Wattson.me Server Tests
+// Wattson.me Server Tests — Pull-Based Architecture
 // Run: node test.js
 
 const http = require('http');
 const assert = require('assert');
 
 const PORT = 18093; // Test port (different from production)
-let serverProcess;
 let passed = 0;
 let failed = 0;
 const results = [];
@@ -57,8 +56,11 @@ async function test(name, fn) {
 
 // ── Tests ──────────────────────────────────────────────────────────────────────
 
+let registeredNodeId = null;
+const AUTH = { 'X-Node-Secret': 'test-secret-123' };
+
 async function runTests() {
-  process.stdout.write('\nWattson.me Server Tests\n');
+  process.stdout.write('\nWattson.me Server Tests (Pull-Based Architecture)\n');
   process.stdout.write('='.repeat(50) + '\n\n');
 
   // ── Health Endpoint ──
@@ -69,33 +71,11 @@ async function runTests() {
     assert.strictEqual(typeof res.body, 'object');
     assert.ok('status' in res.body);
     assert.ok('inferenceNodes' in res.body);
-    assert.ok('mindBridgeAlive' in res.body);
+    assert.ok('pendingJobs' in res.body);
+    assert.ok('uptime' in res.body);
   });
 
-  // ── Network Endpoint ──
-
-  await test('GET /api/network returns node list', async () => {
-    const res = await request('GET', '/api/network');
-    assert.strictEqual(res.status, 200);
-    assert.ok(Array.isArray(res.body.nodes));
-    assert.ok(res.body.nodes.length >= 1);
-    assert.strictEqual(res.body.nodes[0].id, 'node-1');
-    assert.ok('totalQueries' in res.body);
-    assert.ok('deviceCount' in res.body);
-  });
-
-  // ── State Proxy ──
-
-  await test('GET /api/state returns mind bridge data', async () => {
-    const res = await request('GET', '/api/state');
-    // May be 200 (bridge alive) or 502 (bridge down)
-    assert.ok(res.status === 200 || res.status === 502);
-    if (res.status === 200) {
-      assert.strictEqual(typeof res.body, 'object');
-    }
-  });
-
-  // ── Chat Endpoint — Input Validation ──
+  // ── Chat Input Validation ──
 
   await test('POST /api/chat rejects empty body', async () => {
     const res = await request('POST', '/api/chat', {});
@@ -119,27 +99,6 @@ async function runTests() {
     assert.ok(res.body.error.includes('500'));
   });
 
-  await test('POST /api/chat accepts message at 500 chars', async () => {
-    // Use a short timeout — we just care that the server doesn't reject it (not 400)
-    // It may 200 (Ollama responds) or 502 (Ollama slow/down) — both are valid
-    try {
-      const res = await request('POST', '/api/chat', { message: 'Hello' });
-      assert.ok(res.status === 200 || res.status === 502, `Expected 200 or 502, got ${res.status}`);
-    } catch {
-      // Timeout means Ollama is processing (not rejected) — that's acceptable
-    }
-  });
-
-  await test('POST /api/chat strips HTML tags from message', async () => {
-    try {
-      const res = await request('POST', '/api/chat', { message: '<b>Hello</b> world' });
-      // Should not be 400 — HTML stripping should leave "Hello world"
-      assert.ok(res.status === 200 || res.status === 502, `Expected 200 or 502, got ${res.status}`);
-    } catch {
-      // Timeout means server accepted and forwarded — that's fine
-    }
-  });
-
   await test('POST /api/chat rejects non-string message', async () => {
     const res = await request('POST', '/api/chat', { message: 12345 });
     assert.strictEqual(res.status, 400);
@@ -150,24 +109,35 @@ async function runTests() {
     assert.strictEqual(res.status, 400);
   });
 
+  await test('POST /api/chat strips HTML tags from message', async () => {
+    // With no nodes registered, should get 503 (not 400 — HTML stripping leaves valid text)
+    const res = await request('POST', '/api/chat', { message: '<b>Hello</b> world' });
+    assert.strictEqual(res.status, 503, `Expected 503 (no nodes), got ${res.status}`);
+  });
+
+  await test('POST /api/chat returns 503 when no nodes registered', async () => {
+    const res = await request('POST', '/api/chat', { message: 'Hello' });
+    assert.strictEqual(res.status, 503);
+    assert.ok(res.body.error.includes('No inference'));
+  });
+
   // ── Security Headers ──
 
   await test('Responses include security headers', async () => {
     const res = await request('GET', '/health');
-    assert.ok(res.headers['x-content-type-options']);
     assert.strictEqual(res.headers['x-content-type-options'], 'nosniff');
     assert.ok(res.headers['x-frame-options']);
     assert.ok(res.headers['referrer-policy']);
   });
 
-  // ── 404 ──
+  // ── 404/405 ──
 
   await test('Unknown API route returns 404', async () => {
     const res = await request('GET', '/api/nonexistent');
     assert.strictEqual(res.status, 404);
   });
 
-  await test('Unknown method on /api/chat returns 405', async () => {
+  await test('GET /api/chat returns 405', async () => {
     const res = await request('GET', '/api/chat');
     assert.strictEqual(res.status, 405);
   });
@@ -175,7 +145,6 @@ async function runTests() {
   // ── Rate Limiting ──
 
   await test('Rate limiting enforced after burst', async () => {
-    // Send 65 requests rapidly from a unique IP — should exceed the 60/min limit
     const promises = [];
     for (let i = 0; i < 65; i++) {
       promises.push(request('GET', '/health', null, { 'X-Forwarded-For': '10.99.99.99' }));
@@ -185,7 +154,7 @@ async function runTests() {
     assert.ok(rateLimited.length > 0, 'Expected at least one 429 response');
   });
 
-  // ── Static File Serving ──
+  // ── Static Files ──
 
   await test('GET / serves index.html', async () => {
     const res = await request('GET', '/');
@@ -203,146 +172,244 @@ async function runTests() {
     assert.ok(res.status === 400 || res.status === 404);
   });
 
-  // ── Health Check Daemon ──
-
-  await test('Health check marks node offline after 3 failures', async () => {
-    // Access internal registry via /api/network — we need to see failureCount via health endpoint
-    // Trigger manual health checks by hitting /health
-    const res = await request('GET', '/health');
+  await test('GET /dashboard serves index.html (SPA route)', async () => {
+    const res = await request('GET', '/dashboard');
     assert.strictEqual(res.status, 200);
-    assert.ok('inferenceNodes' in res.body || 'status' in res.body);
-  });
-
-  await test('Health check records latency in /api/network', async () => {
-    const res = await request('GET', '/api/network');
-    assert.strictEqual(res.status, 200);
-    // New fields should be present
-    const node = res.body.nodes[0];
-    assert.ok('role' in node, 'Missing role field');
-    assert.ok('queriesServed' in node, 'Missing queriesServed field');
-    assert.ok('failureCount' in node, 'Missing failureCount field');
-  });
-
-  await test('/api/network includes role for all nodes', async () => {
-    const res = await request('GET', '/api/network');
-    assert.strictEqual(res.status, 200);
-    for (const node of res.body.nodes) {
-      assert.ok(node.role === 'inference' || node.role === 'monitor', `Invalid role: ${node.role}`);
-    }
-  });
-
-  await test('/api/network does not expose ollamaUrl', async () => {
-    const res = await request('GET', '/api/network');
-    assert.strictEqual(res.status, 200);
-    for (const node of res.body.nodes) {
-      assert.strictEqual(node.ollamaUrl, undefined, 'ollamaUrl should not be exposed');
-      assert.strictEqual(node.healthUrl, undefined, 'healthUrl should not be exposed');
-    }
-  });
-
-  // ── Smart Routing ──
-
-  await test('POST /api/chat returns 502 or 503 when inference nodes down', async () => {
-    // With nodes likely unreachable in test env, should get 502 or 503
-    try {
-      const res = await request('POST', '/api/chat', { message: 'Hello test' });
-      assert.ok(res.status === 200 || res.status === 502 || res.status === 503,
-        `Expected 200/502/503, got ${res.status}`);
-    } catch {
-      // Timeout means processing, acceptable
-    }
-  });
-
-  await test('/api/network has inferenceOnline and monitorOnline counts', async () => {
-    const res = await request('GET', '/api/network');
-    assert.strictEqual(res.status, 200);
-    assert.ok('inferenceCount' in res.body, 'Missing inferenceCount');
-    assert.ok('monitorCount' in res.body, 'Missing monitorCount');
-  });
-
-  // ── Health Endpoint Updated ──
-
-  await test('/health includes inference and monitor counts', async () => {
-    const res = await request('GET', '/health');
-    assert.strictEqual(res.status, 200);
-    assert.ok('inferenceNodes' in res.body, 'Missing inferenceNodes');
-    assert.ok('monitorNodes' in res.body, 'Missing monitorNodes');
+    assert.ok(res.headers['content-type'].includes('text/html'));
   });
 
   // ── Node Registration ──
 
   await test('POST /api/nodes/register requires X-Node-Secret', async () => {
-    const res = await request('POST', '/api/nodes/register', {
-      name: 'Test Node',
-      role: 'inference',
-      ollamaUrl: 'http://192.168.1.100:11434',
-    });
-    assert.strictEqual(res.status, 401, `Expected 401, got ${res.status}`);
+    const res = await request('POST', '/api/nodes/register', { name: 'Test Node' });
+    assert.strictEqual(res.status, 401);
   });
 
   await test('POST /api/nodes/register rejects wrong secret', async () => {
-    const res = await request('POST', '/api/nodes/register', {
-      name: 'Test Node',
-      role: 'inference',
-      ollamaUrl: 'http://192.168.1.100:11434',
-    }, { 'X-Node-Secret': 'wrong-secret' });
-    assert.strictEqual(res.status, 401, `Expected 401, got ${res.status}`);
-  });
-
-  await test('POST /api/nodes/register rejects inference node without ollamaUrl', async () => {
-    const res = await request('POST', '/api/nodes/register', {
-      name: 'Test Node',
-      role: 'inference',
-    }, { 'X-Node-Secret': 'test-secret-123' });
-    assert.strictEqual(res.status, 400, `Expected 400, got ${res.status}`);
+    const res = await request('POST', '/api/nodes/register',
+      { name: 'Test Node' },
+      { 'X-Node-Secret': 'wrong-secret' }
+    );
+    assert.strictEqual(res.status, 401);
   });
 
   await test('POST /api/nodes/register rejects missing name', async () => {
-    const res = await request('POST', '/api/nodes/register', {
-      role: 'inference',
-      ollamaUrl: 'http://192.168.1.100:11434',
-    }, { 'X-Node-Secret': 'test-secret-123' });
-    assert.strictEqual(res.status, 400, `Expected 400, got ${res.status}`);
+    const res = await request('POST', '/api/nodes/register',
+      { role: 'inference' }, AUTH
+    );
+    assert.strictEqual(res.status, 400);
   });
 
-  await test('POST /api/nodes/register rejects invalid ollamaUrl', async () => {
+  await test('POST /api/nodes/register accepts valid inference node', async () => {
     const res = await request('POST', '/api/nodes/register', {
-      name: 'Test Node',
+      name: 'Test Phone',
       role: 'inference',
-      ollamaUrl: 'not-a-url',
-    }, { 'X-Node-Secret': 'test-secret-123' });
-    assert.strictEqual(res.status, 400, `Expected 400, got ${res.status}`);
+      type: 'phone',
+      model: 'wattson:chat',
+      modelSize: '1.7b',
+      powerMode: 'FULL_FORCE',
+      specs: { ram: '4GB' },
+    }, AUTH);
+    assert.strictEqual(res.status, 201);
+    assert.ok(res.body.node);
+    assert.ok(res.body.node.id);
+    assert.strictEqual(res.body.node.role, 'inference');
+    registeredNodeId = res.body.node.id;
   });
 
-  await test('POST /api/nodes/register accepts monitor node without ollamaUrl', async () => {
+  await test('POST /api/nodes/register accepts monitor node', async () => {
     const res = await request('POST', '/api/nodes/register', {
       name: 'Test Monitor',
       role: 'monitor',
       type: 'raspberry-pi',
-      healthUrl: 'http://192.168.1.200:8085',
-    }, { 'X-Node-Secret': 'test-secret-123' });
-    assert.strictEqual(res.status, 201, `Expected 201, got ${res.status}`);
-    assert.ok(res.body.node, 'Missing node in response');
-    assert.ok(res.body.node.id, 'Missing node id');
+    }, AUTH);
+    assert.strictEqual(res.status, 201);
+    assert.ok(res.body.node);
     assert.strictEqual(res.body.node.role, 'monitor');
   });
 
-  await test('POST /api/nodes/register rejects duplicate ollamaUrl', async () => {
-    // Try registering with the same ollamaUrl as Node 1
-    const res = await request('POST', '/api/nodes/register', {
-      name: 'Duplicate Node',
-      role: 'inference',
-      ollamaUrl: 'http://192.168.5.48:11434',
-    }, { 'X-Node-Secret': 'test-secret-123' });
-    assert.strictEqual(res.status, 409, `Expected 409, got ${res.status}`);
+  // ── Node Poll ──
+
+  await test('GET /api/nodes/poll requires auth (401 without secret)', async () => {
+    const res = await request('GET', '/api/nodes/poll');
+    assert.strictEqual(res.status, 401);
   });
 
-  // ── Dashboard Route ──
+  await test('GET /api/nodes/poll requires X-Node-Id (401 without)', async () => {
+    const res = await request('GET', '/api/nodes/poll', null, AUTH);
+    assert.strictEqual(res.status, 401);
+  });
 
-  await test('GET /dashboard serves index.html (SPA route)', async () => {
-    const res = await request('GET', '/dashboard');
+  await test('GET /api/nodes/poll rejects unregistered node ID', async () => {
+    const res = await request('GET', '/api/nodes/poll', null, {
+      ...AUTH, 'X-Node-Id': 'node-fake-123',
+    });
+    assert.strictEqual(res.status, 401);
+  });
+
+  await test('GET /api/nodes/poll returns 204 when queue empty', async () => {
+    const res = await request('GET', '/api/nodes/poll', null, {
+      ...AUTH, 'X-Node-Id': registeredNodeId,
+    });
+    assert.strictEqual(res.status, 204);
+  });
+
+  // ── End-to-End Flow ──
+
+  await test('Full flow: chat → poll → result → response delivered', async () => {
+    const nodeAuth = { ...AUTH, 'X-Node-Id': registeredNodeId };
+
+    // 1. Fire chat request (don't await — it's held open)
+    const chatPromise = request('POST', '/api/chat', { message: 'What is 2+2?' });
+
+    // 2. Give server time to create the job
+    await new Promise(r => setTimeout(r, 100));
+
+    // 3. Poll for the job
+    const pollRes = await request('GET', '/api/nodes/poll', null, nodeAuth);
+    assert.strictEqual(pollRes.status, 200);
+    assert.ok(pollRes.body.jobId);
+    assert.ok(Array.isArray(pollRes.body.messages));
+
+    // 4. Post result
+    const resultRes = await request('POST', `/api/nodes/result/${pollRes.body.jobId}`, {
+      response: 'The answer is 4.',
+    }, nodeAuth);
+    assert.strictEqual(resultRes.status, 200);
+    assert.ok(resultRes.body.ok);
+
+    // 5. Chat request should now resolve with the response
+    const chatRes = await chatPromise;
+    assert.strictEqual(chatRes.status, 200);
+    assert.strictEqual(chatRes.body.response, 'The answer is 4.');
+  });
+
+  await test('GET /api/nodes/poll marks job as processing (skips it on next poll)', async () => {
+    const nodeAuth = { ...AUTH, 'X-Node-Id': registeredNodeId };
+
+    // Fire a chat request
+    const chatPromise = request('POST', '/api/chat', { message: 'Test processing' });
+    await new Promise(r => setTimeout(r, 100));
+
+    // First poll picks up the job
+    const poll1 = await request('GET', '/api/nodes/poll', null, nodeAuth);
+    assert.strictEqual(poll1.status, 200);
+
+    // Second poll should find no pending jobs
+    const poll2 = await request('GET', '/api/nodes/poll', null, nodeAuth);
+    assert.strictEqual(poll2.status, 204);
+
+    // Clean up: post result so the chat resolves
+    await request('POST', `/api/nodes/result/${poll1.body.jobId}`, {
+      response: 'Done',
+    }, nodeAuth);
+    await chatPromise;
+  });
+
+  // ── Node Result Validation ──
+
+  await test('POST /api/nodes/result requires auth headers', async () => {
+    const res = await request('POST', '/api/nodes/result/fake-job-id', {
+      response: 'test',
+    });
+    assert.strictEqual(res.status, 401);
+  });
+
+  await test('POST /api/nodes/result returns 404 for unknown jobId', async () => {
+    const nodeAuth = { ...AUTH, 'X-Node-Id': registeredNodeId };
+    const res = await request('POST', '/api/nodes/result/nonexistent-job', {
+      response: 'test',
+    }, nodeAuth);
+    assert.strictEqual(res.status, 404);
+  });
+
+  await test('POST /api/nodes/result rejects empty response', async () => {
+    const nodeAuth = { ...AUTH, 'X-Node-Id': registeredNodeId };
+
+    // Create a job and poll it
+    const chatPromise = request('POST', '/api/chat', { message: 'Empty response test' });
+    await new Promise(r => setTimeout(r, 100));
+    const pollRes = await request('GET', '/api/nodes/poll', null, nodeAuth);
+    assert.strictEqual(pollRes.status, 200);
+
+    // Post empty response — should be rejected
+    const res = await request('POST', `/api/nodes/result/${pollRes.body.jobId}`, {
+      response: '',
+    }, nodeAuth);
+    assert.strictEqual(res.status, 400);
+
+    // Wait for the held chat request to timeout (JOB_TIMEOUT_MS=3000)
+    const chatRes = await chatPromise;
+    assert.strictEqual(chatRes.status, 504);
+  });
+
+  await test('POST /api/nodes/result updates node stats', async () => {
+    const nodeAuth = { ...AUTH, 'X-Node-Id': registeredNodeId };
+
+    // Do a full round-trip
+    const chatPromise = request('POST', '/api/chat', { message: 'Stats test' });
+    await new Promise(r => setTimeout(r, 100));
+    const pollRes = await request('GET', '/api/nodes/poll', null, nodeAuth);
+    await request('POST', `/api/nodes/result/${pollRes.body.jobId}`, {
+      response: 'Stats verified.',
+    }, nodeAuth);
+    await chatPromise;
+
+    // Check network endpoint for updated stats
+    const netRes = await request('GET', '/api/network');
+    const node = netRes.body.nodes.find(n => n.id === registeredNodeId);
+    assert.ok(node);
+    assert.ok(node.queriesServed >= 1, `Expected queriesServed >= 1, got ${node.queriesServed}`);
+    assert.ok(node.averageResponseMs > 0, 'Expected averageResponseMs > 0');
+  });
+
+  // ── Job Timeout ──
+
+  await test('POST /api/chat times out when no node picks up', async () => {
+    const start = Date.now();
+    const res = await request('POST', '/api/chat', { message: 'Timeout test' });
+    const elapsed = Date.now() - start;
+    assert.strictEqual(res.status, 504);
+    assert.ok(res.body.error.includes('busy'));
+    assert.ok(elapsed >= 2500, `Expected timeout >= 2500ms, got ${elapsed}ms`);
+  });
+
+  // ── Network Endpoint (with nodes registered) ──
+
+  await test('GET /api/network returns node list', async () => {
+    const res = await request('GET', '/api/network');
     assert.strictEqual(res.status, 200);
-    assert.ok(res.headers['content-type'].includes('text/html'));
+    assert.ok(Array.isArray(res.body.nodes));
+    assert.ok(res.body.nodes.length >= 1);
+    assert.ok('totalQueries' in res.body);
+    assert.ok('deviceCount' in res.body);
+    assert.ok('pendingJobs' in res.body);
+    assert.ok('processingJobs' in res.body);
+  });
+
+  await test('/api/network includes lastSeen for nodes', async () => {
+    const res = await request('GET', '/api/network');
+    const node = res.body.nodes.find(n => n.id === registeredNodeId);
+    assert.ok(node);
+    assert.ok(node.lastSeen, 'Missing lastSeen field');
+    assert.ok(node.queriesServed !== undefined, 'Missing queriesServed field');
+  });
+
+  await test('/api/network does not expose internal fields', async () => {
+    const res = await request('GET', '/api/network');
+    for (const node of res.body.nodes) {
+      assert.strictEqual(node.ollamaUrl, undefined, 'ollamaUrl should not be exposed');
+    }
+  });
+
+  await test('/health includes job queue stats', async () => {
+    const res = await request('GET', '/health');
+    assert.strictEqual(res.status, 200);
+    assert.ok('inferenceNodes' in res.body);
+    assert.ok('monitorNodes' in res.body);
+    assert.ok('pendingJobs' in res.body);
+    assert.ok('processingJobs' in res.body);
+    assert.ok('totalQueries' in res.body);
   });
 
   // ── Summary ──
@@ -364,15 +431,12 @@ async function main() {
   process.env.RATE_LIMIT_PER_MIN = '60';
   process.env.RATE_LIMIT_PER_HOUR = '200';
   process.env.MAX_INPUT_LENGTH = '500';
-  process.env.OLLAMA_URL = process.env.OLLAMA_URL || 'http://192.168.5.48:11434';
-  process.env.CHAT_MODEL = 'wattson:chat';
-  process.env.MIND_BRIDGE_URL = 'http://localhost:8081';
   process.env.LOG_FILE = '/dev/null';
   process.env.NODE_SECRET = 'test-secret-123';
-  process.env.HEALTH_CHECK_INTERVAL_MS = '999999';
-  process.env.HEALTH_CHECK_TIMEOUT_MS = '3000';
-  process.env.MAX_CONSECUTIVE_FAILURES = '3';
-  process.env.REGISTRY_SAVE_INTERVAL_MS = '999999';
+  process.env.JOB_TIMEOUT_MS = '3000';
+  process.env.JOB_CLEANUP_INTERVAL_MS = '999999';
+  process.env.MAX_QUEUE_SIZE = '100';
+  process.env.NODE_STALE_MS = '999999';
 
   // Start server
   try {
