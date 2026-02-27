@@ -600,6 +600,94 @@ main{position:relative;z-index:1;min-height:100vh;min-height:100dvh}
 }
 .health-label{font-size:13px;color:rgba(245,245,247,0.35)}
 
+/* ── DASHBOARD PAGE ──────────────────────────────────────────────────────── */
+.dash-content{max-width:960px;margin:0 auto;padding:80px 24px 64px}
+.dash-hero{text-align:center;margin-bottom:40px}
+.dash-hero h1{
+  font-size:clamp(1.8rem,4vw,2.5rem);font-weight:700;
+  letter-spacing:-0.02em;margin-bottom:8px;
+}
+.dash-hero p{font-size:15px;color:rgba(245,245,247,0.45)}
+.dash-overview{
+  display:flex;gap:12px;margin-bottom:40px;flex-wrap:wrap;
+}
+.dash-stat{
+  flex:1;min-width:120px;
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:12px;padding:20px;text-align:center;
+}
+.dash-stat .stat-value{
+  font-size:clamp(1.5rem,4vw,2rem);font-weight:700;
+  color:#F5F5F7;margin-bottom:4px;
+}
+.dash-stat .stat-label{font-size:12px;color:rgba(245,245,247,0.35)}
+.dash-table-wrap{overflow-x:auto;margin-bottom:24px}
+.dash-table{
+  width:100%;border-collapse:collapse;
+  font-size:14px;color:rgba(245,245,247,0.75);
+}
+.dash-table th{
+  text-align:left;padding:10px 12px;
+  font-size:12px;font-weight:600;
+  color:rgba(245,245,247,0.4);
+  text-transform:uppercase;letter-spacing:0.04em;
+  border-bottom:1px solid rgba(255,255,255,0.08);
+  white-space:nowrap;
+}
+.dash-table td{
+  padding:12px;
+  border-bottom:1px solid rgba(255,255,255,0.04);
+  white-space:nowrap;
+}
+.dash-table tbody tr:hover{background:rgba(255,255,255,0.02)}
+.dash-status-dot{
+  display:inline-block;width:10px;height:10px;border-radius:50%;
+  vertical-align:middle;
+}
+.dash-status-dot.online{
+  background:#30D158;
+  box-shadow:0 0 6px rgba(48,209,88,0.4);
+}
+.dash-status-dot.offline{
+  background:rgba(245,245,247,0.2);box-shadow:none;
+}
+.role-badge{
+  display:inline-block;
+  font-size:11px;font-weight:600;
+  padding:2px 8px;border-radius:4px;
+  text-transform:uppercase;letter-spacing:0.03em;
+}
+.role-badge.inference{background:rgba(10,132,255,0.15);color:#409CFF}
+.role-badge.monitor{background:rgba(255,214,10,0.15);color:#FFD60A}
+.query-bar-wrap{
+  width:80px;height:6px;
+  background:rgba(255,255,255,0.06);
+  border-radius:3px;overflow:hidden;
+  display:inline-block;vertical-align:middle;
+  margin-right:8px;
+}
+.query-bar{
+  height:100%;border-radius:3px;
+  background:linear-gradient(90deg,#0A84FF,#30D158);
+  transition:width 0.5s ease;
+}
+.dash-footer{
+  display:flex;justify-content:space-between;
+  font-size:12px;color:rgba(245,245,247,0.25);
+  padding-top:16px;
+  border-top:1px solid rgba(255,255,255,0.04);
+}
+@media(max-width:768px){
+  .dash-content{padding:72px 16px 48px}
+  .dash-overview{flex-direction:column}
+  .dash-table{font-size:13px}
+  .dash-table th,.dash-table td{padding:8px 8px}
+}
+@media(max-width:480px){
+  .dash-content{padding:68px 12px 40px}
+}
+
 /* ── Shared ───────────────────────────────────────────────────────────────── */
 .section-divider{
   height:1px;background:rgba(255,255,255,0.06);
@@ -670,6 +758,7 @@ main{position:relative;z-index:1;min-height:100vh;min-height:100dvh}
     <li class="nav-tab" data-page="about" onclick="navigateTo('/about')">About</li>
     <li class="nav-tab" data-page="start" onclick="navigateTo('/start')">Get Started</li>
     <li class="nav-tab" data-page="meet" onclick="navigateTo('/meet')">Meet Wattson</li>
+    <li class="nav-tab" data-page="dashboard" onclick="navigateTo('/dashboard')">Dashboard</li>
   </ul>
   <button class="nav-hamburger" id="hamburger-btn" onclick="toggleMobileMenu()">
     <div class="hamburger-icon"><span></span><span></span><span></span></div>
@@ -680,6 +769,7 @@ main{position:relative;z-index:1;min-height:100vh;min-height:100dvh}
   <a class="mobile-menu-item" data-page="about" onclick="navigateTo('/about');closeMobileMenu()">About</a>
   <a class="mobile-menu-item" data-page="start" onclick="navigateTo('/start');closeMobileMenu()">Get Started</a>
   <a class="mobile-menu-item" data-page="meet" onclick="navigateTo('/meet');closeMobileMenu()">Meet Wattson</a>
+  <a class="mobile-menu-item" data-page="dashboard" onclick="navigateTo('/dashboard');closeMobileMenu()">Dashboard</a>
 </div>
 
 <!-- Error Toast -->
@@ -953,6 +1043,56 @@ ollama serve</pre>
   </div>
 </section>
 
+<!-- DASHBOARD PAGE -->
+<section class="page" id="page-dashboard">
+  <div class="dash-content">
+    <div class="dash-hero">
+      <h1>Network Dashboard</h1>
+      <p>Real-time node stats &amp; health monitoring</p>
+    </div>
+    <div class="dash-overview" id="dash-overview">
+      <div class="dash-stat">
+        <div class="stat-value" id="dash-total-nodes">-</div>
+        <div class="stat-label">Total Nodes</div>
+      </div>
+      <div class="dash-stat">
+        <div class="stat-value" id="dash-inference-online">-</div>
+        <div class="stat-label">Inference Online</div>
+      </div>
+      <div class="dash-stat">
+        <div class="stat-value" id="dash-monitor-online">-</div>
+        <div class="stat-label">Monitors Online</div>
+      </div>
+      <div class="dash-stat">
+        <div class="stat-value" id="dash-total-queries">-</div>
+        <div class="stat-label">Queries Served</div>
+      </div>
+    </div>
+    <h2 class="section-title">Node Status</h2>
+    <div class="dash-table-wrap">
+      <table class="dash-table" id="dash-table">
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Node</th>
+            <th>Role</th>
+            <th>Queries</th>
+            <th>Avg Response</th>
+            <th>Latency</th>
+            <th>Failures</th>
+            <th>Last Check</th>
+          </tr>
+        </thead>
+        <tbody id="dash-table-body"></tbody>
+      </table>
+    </div>
+    <div class="dash-footer">
+      <span id="dash-refresh-label">Auto-refreshes every 10s</span>
+      <span>Network v<span id="dash-version">-</span></span>
+    </div>
+  </div>
+</section>
+
 </main>
 
 <script>
@@ -964,7 +1104,7 @@ ollama serve</pre>
 // ── SPA Router ───────────────────────────────────────────────────────────────
 
 var currentPage = 'home';
-var pageMap = { '/': 'home', '/about': 'about', '/start': 'start', '/meet': 'meet', '/connect': 'connect' };
+var pageMap = { '/': 'home', '/about': 'about', '/start': 'start', '/meet': 'meet', '/connect': 'connect', '/dashboard': 'dashboard' };
 
 function navigateTo(path) {
   var pageName = pageMap[path] || 'home';
@@ -1001,6 +1141,7 @@ function showPage(pageName) {
 
   if (pageName === 'meet') initFace();
   if (pageName === 'connect') loadNetwork();
+  if (pageName === 'dashboard') loadDashboard();
   window.scrollTo(0, 0);
 }
 
@@ -1024,6 +1165,7 @@ window.addEventListener('popstate', function(e) {
   history.replaceState({ page: initial }, '', location.pathname);
   if (initial === 'meet') setTimeout(initFace, 100);
   if (initial === 'connect') setTimeout(loadNetwork, 100);
+  if (initial === 'dashboard') setTimeout(loadDashboard, 100);
 })();
 
 // ── Mobile Menu ──────────────────────────────────────────────────────────────
@@ -1561,6 +1703,68 @@ function loadNetwork() {
   }).catch(function() {
     document.getElementById('health-label').textContent = 'Could not reach network';
   });
+}
+
+// ── Dashboard ────────────────────────────────────────────────────────────
+
+var dashTimer = null;
+
+function loadDashboard() {
+  if (dashTimer) clearInterval(dashTimer);
+  fetchDashboard();
+  dashTimer = setInterval(function() {
+    if (currentPage === 'dashboard') fetchDashboard();
+    else { clearInterval(dashTimer); dashTimer = null; }
+  }, 10000);
+}
+
+function fetchDashboard() {
+  fetch('/api/network').then(function(r) { return r.json(); }).then(function(d) {
+    document.getElementById('dash-total-nodes').textContent = d.deviceCount || 0;
+    document.getElementById('dash-inference-online').textContent = (d.inferenceOnline || 0) + '/' + (d.inferenceCount || 0);
+    document.getElementById('dash-monitor-online').textContent = (d.monitorOnline || 0) + '/' + (d.monitorCount || 0);
+    document.getElementById('dash-total-queries').textContent = d.totalQueries || 0;
+    document.getElementById('dash-version').textContent = d.networkVersion || '-';
+
+    var tbody = document.getElementById('dash-table-body');
+    tbody.innerHTML = '';
+    var nodes = d.nodes || [];
+    var maxQ = 1;
+    for (var i = 0; i < nodes.length; i++) {
+      if ((nodes[i].queriesServed || 0) > maxQ) maxQ = nodes[i].queriesServed;
+    }
+    for (var j = 0; j < nodes.length; j++) {
+      var n = nodes[j];
+      var tr = document.createElement('tr');
+      var statusCls = n.status === 'online' ? 'online' : 'offline';
+      var roleCls = n.role || 'inference';
+      var qPct = maxQ > 0 ? Math.round(((n.queriesServed || 0) / maxQ) * 100) : 0;
+      var lastCheck = n.lastHealthCheck ? timeAgo(n.lastHealthCheck) : 'Never';
+      var avgMs = n.averageResponseMs ? n.averageResponseMs + 'ms' : '-';
+      var latMs = n.latencyMs != null ? n.latencyMs + 'ms' : '-';
+      tr.innerHTML =
+        '<td><span class="dash-status-dot ' + statusCls + '"></span></td>' +
+        '<td><strong>' + esc(n.name) + '</strong><br><span style="font-size:12px;color:rgba(245,245,247,0.35)">' + esc(n.type || '') + '</span></td>' +
+        '<td><span class="role-badge ' + roleCls + '">' + esc(roleCls) + '</span></td>' +
+        '<td><div class="query-bar-wrap"><div class="query-bar" style="width:' + qPct + '%"></div></div>' + (n.queriesServed || 0) + '</td>' +
+        '<td>' + avgMs + '</td>' +
+        '<td>' + latMs + '</td>' +
+        '<td>' + (n.failureCount || 0) + '</td>' +
+        '<td style="font-size:12px;color:rgba(245,245,247,0.35)">' + lastCheck + '</td>';
+      tbody.appendChild(tr);
+    }
+  }).catch(function() {
+    document.getElementById('dash-refresh-label').textContent = 'Could not reach network';
+  });
+}
+
+function timeAgo(iso) {
+  var diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diff < 5) return 'just now';
+  if (diff < 60) return diff + 's ago';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  return Math.floor(diff / 86400) + 'd ago';
 }
 
 // ── Utilities ────────────────────────────────────────────────────────────────

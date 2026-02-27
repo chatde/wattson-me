@@ -22,6 +22,11 @@ const CONFIG = {
   ipSalt: process.env.IP_SALT || 'change-me',
   corsOrigin: process.env.CORS_ORIGIN || 'https://wattson.me',
   logFile: process.env.LOG_FILE || path.join(__dirname, 'conversations.jsonl'),
+  nodeSecret: process.env.NODE_SECRET || '',
+  healthCheckIntervalMs: parseInt(process.env.HEALTH_CHECK_INTERVAL_MS || '30000', 10),
+  healthCheckTimeoutMs: parseInt(process.env.HEALTH_CHECK_TIMEOUT_MS || '5000', 10),
+  maxConsecutiveFailures: parseInt(process.env.MAX_CONSECUTIVE_FAILURES || '3', 10),
+  registrySaveIntervalMs: parseInt(process.env.REGISTRY_SAVE_INTERVAL_MS || '60000', 10),
 };
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -180,6 +185,84 @@ function logConversation(hashedIP, message, response) {
   }
 }
 
+// ── Health Check Daemon ────────────────────────────────────────────────────
+
+async function checkNodeHealth(node) {
+  const start = Date.now();
+  const url = node.role === 'monitor'
+    ? node.healthUrl
+    : (node.ollamaUrl ? node.ollamaUrl + '/api/tags' : null);
+
+  if (!url) return;
+
+  try {
+    await proxyGet(url, CONFIG.healthCheckTimeoutMs);
+    const latency = Date.now() - start;
+    node.latencyMs = latency;
+    node.lastHealthCheck = new Date().toISOString();
+    node.lastHealthOk = new Date().toISOString();
+    node.failureCount = 0;
+    node.status = 'online';
+  } catch {
+    node.lastHealthCheck = new Date().toISOString();
+    node.failureCount = (node.failureCount || 0) + 1;
+    node.latencyMs = null;
+    if (node.failureCount >= CONFIG.maxConsecutiveFailures) {
+      node.status = 'offline';
+    }
+  }
+}
+
+async function runHealthChecks() {
+  await Promise.allSettled(registry.nodes.map(n => checkNodeHealth(n)));
+}
+
+let healthCheckTimer = null;
+let registrySaveTimer = null;
+
+function startHealthDaemon() {
+  // Initial check after 5s
+  setTimeout(() => {
+    runHealthChecks();
+  }, 5000);
+
+  // Periodic checks
+  healthCheckTimer = setInterval(() => {
+    runHealthChecks();
+  }, CONFIG.healthCheckIntervalMs);
+
+  // Periodic registry save
+  registrySaveTimer = setInterval(() => {
+    try {
+      fs.writeFile(registryPath, JSON.stringify(registry, null, 2), () => {});
+    } catch { /* best effort */ }
+  }, CONFIG.registrySaveIntervalMs);
+}
+
+// ── Smart Routing ─────────────────────────────────────────────────────────
+
+function selectNode() {
+  const candidates = registry.nodes.filter(n =>
+    n.role === 'inference' && n.status === 'online'
+  );
+
+  if (candidates.length === 0) return null;
+
+  // Sort: powerMode priority (FULL_FORCE > HALF_FORCE > ECO), then lowest latency, then fewest failures
+  const powerOrder = { 'FULL_FORCE': 0, 'HALF_FORCE': 1, 'ECO': 2 };
+  candidates.sort((a, b) => {
+    const pa = powerOrder[a.powerMode] ?? 1;
+    const pb = powerOrder[b.powerMode] ?? 1;
+    if (pa !== pb) return pa - pb;
+    const la = a.latencyMs ?? 9999;
+    const lb = b.latencyMs ?? 9999;
+    if (la !== lb) return la - lb;
+    return (a.failureCount || 0) - (b.failureCount || 0);
+  });
+
+  return candidates;
+}
+
 // ── MIME Types ──────────────────────────────────────────────────────────────────
 
 const MIME_TYPES = {
@@ -212,7 +295,7 @@ function serveStatic(req, res, urlPath) {
   const cleanPath = urlPath.split('?')[0];
 
   if (cleanPath === '/' || cleanPath === '/about' || cleanPath === '/start' ||
-      cleanPath === '/meet' || cleanPath === '/connect') {
+      cleanPath === '/meet' || cleanPath === '/connect' || cleanPath === '/dashboard') {
     filePath = path.join(PUBLIC_DIR, 'index.html');
   } else {
     filePath = path.join(PUBLIC_DIR, cleanPath);
@@ -315,28 +398,49 @@ async function handleChat(req, res, clientIP) {
 
   messages.push({ role: 'user', content: message });
 
-  try {
-    const result = await proxyPost(`${CONFIG.ollamaUrl}/api/chat`, {
-      model: CONFIG.chatModel,
-      messages,
-      stream: false,
-      think: false,
-      options: { num_ctx: 512, num_predict: 256, temperature: 0.8 },
-    });
-
-    const response = sanitizeOutput(result.message?.content || '');
-    if (!response) {
-      sendJSON(res, 502, { error: 'Empty response from AI' });
-      return;
-    }
-
-    registry.totalQueries++;
-    logConversation(hashIP(clientIP), message, response);
-
-    sendJSON(res, 200, { response });
-  } catch (err) {
-    sendJSON(res, 502, { error: 'AI is currently unavailable. Please try again.' });
+  const candidates = selectNode();
+  if (!candidates || candidates.length === 0) {
+    sendJSON(res, 503, { error: 'No inference nodes available. Please try again later.' });
+    return;
   }
+
+  let lastError = null;
+  for (const node of candidates) {
+    try {
+      const start = Date.now();
+      const result = await proxyPost(`${node.ollamaUrl}/api/chat`, {
+        model: node.model || CONFIG.chatModel,
+        messages,
+        stream: false,
+        think: false,
+        options: { num_ctx: 512, num_predict: 256, temperature: 0.8 },
+      });
+
+      const response = sanitizeOutput(result.message?.content || '');
+      if (!response) {
+        lastError = 'Empty response from AI';
+        node.failureCount = (node.failureCount || 0) + 1;
+        continue;
+      }
+
+      const elapsed = Date.now() - start;
+      node.queriesServed = (node.queriesServed || 0) + 1;
+      // Exponential moving average for response time
+      node.averageResponseMs = node.averageResponseMs
+        ? node.averageResponseMs * 0.7 + elapsed * 0.3
+        : elapsed;
+      registry.totalQueries++;
+      logConversation(hashIP(clientIP), message, response);
+
+      sendJSON(res, 200, { response });
+      return;
+    } catch {
+      node.failureCount = (node.failureCount || 0) + 1;
+      lastError = 'Node failed';
+    }
+  }
+
+  sendJSON(res, 502, { error: 'AI is currently unavailable. Please try again.' });
 }
 
 async function handleState(req, res) {
@@ -353,39 +457,178 @@ function handleNetwork(req, res) {
     id: n.id,
     name: n.name,
     type: n.type,
+    role: n.role || 'inference',
     model: n.model,
     modelSize: n.modelSize,
     status: n.status,
     powerMode: n.powerMode,
     specs: n.specs,
     joinedAt: n.joinedAt,
+    lastHealthCheck: n.lastHealthCheck,
+    lastHealthOk: n.lastHealthOk,
+    queriesServed: n.queriesServed || 0,
+    averageResponseMs: n.averageResponseMs ? Math.round(n.averageResponseMs) : null,
+    failureCount: n.failureCount || 0,
+    latencyMs: n.latencyMs,
   }));
+
+  const inferenceNodes = safeNodes.filter(n => n.role === 'inference');
+  const monitorNodes = safeNodes.filter(n => n.role === 'monitor');
 
   sendJSON(res, 200, {
     nodes: safeNodes,
     totalQueries: registry.totalQueries,
     deviceCount: safeNodes.length,
     onlineCount: safeNodes.filter(n => n.status === 'online').length,
+    inferenceCount: inferenceNodes.length,
+    inferenceOnline: inferenceNodes.filter(n => n.status === 'online').length,
+    monitorCount: monitorNodes.length,
+    monitorOnline: monitorNodes.filter(n => n.status === 'online').length,
     networkVersion: registry.networkVersion,
   });
 }
 
 async function handleHealth(req, res) {
-  let ollamaAlive = false;
   let mindBridgeAlive = false;
-
-  try {
-    await proxyGet(`${CONFIG.ollamaUrl}/api/tags`, 5000);
-    ollamaAlive = true;
-  } catch { /* offline */ }
 
   try {
     await proxyGet(`${CONFIG.mindBridgeUrl}/api/state`, 5000);
     mindBridgeAlive = true;
   } catch { /* offline */ }
 
-  const status = ollamaAlive ? 'healthy' : 'degraded';
-  sendJSON(res, 200, { status, ollamaAlive, mindBridgeAlive, uptime: process.uptime() });
+  const inferenceNodes = registry.nodes.filter(n => (n.role || 'inference') === 'inference');
+  const monitorNodes = registry.nodes.filter(n => n.role === 'monitor');
+  const inferenceOnline = inferenceNodes.filter(n => n.status === 'online').length;
+  const monitorOnline = monitorNodes.filter(n => n.status === 'online').length;
+
+  const status = inferenceOnline > 0 ? 'healthy' : 'degraded';
+  sendJSON(res, 200, {
+    status,
+    inferenceNodes: inferenceNodes.length,
+    inferenceOnline,
+    monitorNodes: monitorNodes.length,
+    monitorOnline,
+    mindBridgeAlive,
+    uptime: process.uptime(),
+  });
+}
+
+// ── Node Registration ─────────────────────────────────────────────────────
+
+async function handleRegister(req, res) {
+  if (req.method !== 'POST') {
+    sendJSON(res, 405, { error: 'Method not allowed' });
+    return;
+  }
+
+  // Check secret
+  if (!CONFIG.nodeSecret) {
+    sendJSON(res, 403, { error: 'Registration is disabled' });
+    return;
+  }
+
+  const secret = req.headers['x-node-secret'];
+  if (!secret || secret !== CONFIG.nodeSecret) {
+    sendJSON(res, 401, { error: 'Invalid or missing secret' });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readBody(req);
+  } catch (err) {
+    sendJSON(res, 400, { error: err.message });
+    return;
+  }
+
+  // Validate required fields
+  if (!body.name || typeof body.name !== 'string') {
+    sendJSON(res, 400, { error: 'name is required' });
+    return;
+  }
+
+  const role = body.role || 'inference';
+  if (role !== 'inference' && role !== 'monitor') {
+    sendJSON(res, 400, { error: 'role must be "inference" or "monitor"' });
+    return;
+  }
+
+  // Inference nodes require ollamaUrl
+  if (role === 'inference') {
+    if (!body.ollamaUrl || typeof body.ollamaUrl !== 'string') {
+      sendJSON(res, 400, { error: 'ollamaUrl is required for inference nodes' });
+      return;
+    }
+
+    // Validate URL
+    try {
+      new URL(body.ollamaUrl);
+    } catch {
+      sendJSON(res, 400, { error: 'ollamaUrl must be a valid URL' });
+      return;
+    }
+
+    // Check for duplicate ollamaUrl
+    const dup = registry.nodes.find(n => n.ollamaUrl === body.ollamaUrl);
+    if (dup) {
+      sendJSON(res, 409, { error: 'A node with this ollamaUrl already exists' });
+      return;
+    }
+
+    // Verify reachable
+    try {
+      await proxyGet(body.ollamaUrl + '/api/tags', CONFIG.healthCheckTimeoutMs);
+    } catch {
+      sendJSON(res, 422, { error: 'Could not reach ollamaUrl — is Ollama running?' });
+      return;
+    }
+  }
+
+  // Generate unique ID
+  const nodeNum = registry.nodes.length + 1;
+  const tsBase36 = Date.now().toString(36);
+  const randHex = crypto.randomBytes(2).toString('hex');
+  const nodeId = `node-${nodeNum}-${tsBase36}-${randHex}`;
+
+  const newNode = {
+    id: nodeId,
+    name: stripHtml(body.name).slice(0, 50),
+    type: body.type || 'unknown',
+    role: role,
+    model: body.model || null,
+    modelSize: body.modelSize || null,
+    ollamaUrl: role === 'inference' ? body.ollamaUrl : undefined,
+    healthUrl: body.healthUrl || undefined,
+    status: 'online',
+    powerMode: body.powerMode || 'FULL_FORCE',
+    specs: body.specs || {},
+    joinedAt: new Date().toISOString(),
+    lastHealthCheck: null,
+    lastHealthOk: null,
+    queriesServed: 0,
+    averageResponseMs: 0,
+    failureCount: 0,
+    latencyMs: null,
+  };
+
+  registry.nodes.push(newNode);
+
+  // Save immediately
+  try {
+    fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2));
+  } catch { /* best effort */ }
+
+  // Return safe node data (no ollamaUrl/healthUrl)
+  sendJSON(res, 201, {
+    node: {
+      id: newNode.id,
+      name: newNode.name,
+      type: newNode.type,
+      role: newNode.role,
+      status: newNode.status,
+      powerMode: newNode.powerMode,
+    },
+  });
 }
 
 // ── Response Helper ────────────────────────────────────────────────────────────
@@ -451,6 +694,8 @@ const server = http.createServer((req, res) => {
   } else if (pathname === '/health') {
     if (req.method !== 'GET') { sendJSON(res, 405, { error: 'Method not allowed' }); return; }
     handleHealth(req, res);
+  } else if (pathname === '/api/nodes/register') {
+    handleRegister(req, res);
   } else if (pathname.startsWith('/api/')) {
     sendJSON(res, 404, { error: 'Not found' });
   } else {
@@ -462,11 +707,14 @@ const server = http.createServer((req, res) => {
 server.listen(CONFIG.port, CONFIG.host, () => {
   const mode = process.env.NODE_ENV === 'test' ? 'TEST' : 'PRODUCTION';
   process.stdout.write(`[wattson.me] ${mode} server listening on ${CONFIG.host}:${CONFIG.port}\n`);
+  startHealthDaemon();
 });
 
 // Graceful shutdown
 function shutdown() {
   process.stdout.write('[wattson.me] Shutting down...\n');
+  if (healthCheckTimer) clearInterval(healthCheckTimer);
+  if (registrySaveTimer) clearInterval(registrySaveTimer);
   server.close(() => {
     // Save registry
     try {
