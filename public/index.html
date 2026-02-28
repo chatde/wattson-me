@@ -403,6 +403,176 @@ main{position:relative;z-index:1;min-height:100vh;min-height:100dvh}
   font-size:13px;line-height:1.6;
   color:rgba(245,245,247,0.75);
 }
+/* Contribute Wizard */
+.contribute-wizard{
+  max-width:640px;margin:0 auto 48px;
+}
+.wizard-progress{
+  display:flex;align-items:center;justify-content:center;
+  gap:0;margin-bottom:32px;
+}
+.wizard-progress-step{
+  display:flex;align-items:center;gap:8px;
+  font-size:13px;font-weight:600;
+  color:rgba(245,245,247,0.25);
+  transition:color 0.3s ease;
+  white-space:nowrap;
+}
+.wizard-progress-step span{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:28px;height:28px;border-radius:50%;
+  background:rgba(255,255,255,0.06);
+  color:rgba(245,245,247,0.3);
+  font-size:13px;font-weight:700;
+  transition:all 0.3s ease;
+}
+.wizard-progress-step.active span{
+  background:rgba(10,132,255,0.2);color:#0A84FF;
+}
+.wizard-progress-step.active{color:rgba(245,245,247,0.8)}
+.wizard-progress-step.completed span{
+  background:rgba(48,209,88,0.2);color:#30D158;
+}
+.wizard-progress-step.completed{color:rgba(245,245,247,0.5)}
+.wizard-progress-line{
+  flex:0 0 40px;height:2px;
+  background:rgba(255,255,255,0.06);
+  margin:0 12px;
+  transition:background 0.3s ease;
+}
+.wizard-progress-line.active{background:rgba(10,132,255,0.4)}
+.wiz-step{
+  display:none;text-align:center;
+  animation:fadeSlideUp 0.4s ease;
+}
+.wiz-step.active{display:block}
+.wiz-step h3{
+  font-size:20px;font-weight:600;margin-bottom:8px;
+  color:rgba(245,245,247,0.9);
+}
+.wiz-step>p{
+  font-size:15px;color:rgba(245,245,247,0.45);
+  margin-bottom:24px;
+}
+.wiz-alt-token{margin-top:24px}
+.wiz-alt-toggle{
+  font-size:14px;color:rgba(245,245,247,0.35);
+  text-decoration:underline;
+  text-underline-offset:3px;
+  transition:color 0.2s ease;
+  background:none;border:none;cursor:pointer;
+}
+@media(hover:hover){.wiz-alt-toggle:hover{color:rgba(245,245,247,0.6)}}
+.wiz-alt-input{
+  display:flex;gap:8px;margin-top:12px;
+  max-width:420px;margin-left:auto;margin-right:auto;
+}
+.wiz-alt-input input{
+  flex:1;padding:10px 16px;
+  font-size:14px;font-family:'SF Mono','Fira Code',monospace;
+  color:#F5F5F7;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:8px;outline:none;
+  transition:border-color 0.2s ease;
+}
+.wiz-alt-input input:focus{border-color:rgba(10,132,255,0.4)}
+.wiz-alt-input button{
+  padding:10px 20px;border-radius:8px;
+  font-size:14px;font-weight:600;
+  color:#fff;background:#0A84FF;
+  transition:background 0.2s ease;
+}
+@media(hover:hover){.wiz-alt-input button:hover{background:#409CFF}}
+.wiz-next-btn{
+  display:block;margin:24px auto 0;
+  padding:16px 48px;
+  font-size:18px;font-weight:600;
+  color:#fff;
+  background:linear-gradient(135deg,#0A84FF 0%,#5E5CE6 100%);
+  border-radius:50px;
+  box-shadow:0 0 24px rgba(10,132,255,0.3),0 0 64px rgba(94,92,230,0.15);
+  transition:all 0.3s ease;
+}
+@media(hover:hover){.wiz-next-btn:hover{
+  transform:translateY(-2px);
+  box-shadow:0 0 32px rgba(10,132,255,0.5),0 0 80px rgba(94,92,230,0.25);
+}}
+.wiz-next-btn:active{transform:scale(0.97)}
+.wiz-link-btn{
+  display:block;margin:12px auto 0;
+  font-size:13px;color:rgba(245,245,247,0.35);
+  text-decoration:underline;text-underline-offset:3px;
+  background:none;border:none;cursor:pointer;
+  transition:color 0.2s ease;
+}
+@media(hover:hover){.wiz-link-btn:hover{color:rgba(245,245,247,0.6)}}
+.wiz-loading{
+  text-align:center;padding:32px;
+  color:rgba(245,245,247,0.4);font-size:15px;
+}
+.wizard-detected{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(48,209,88,0.1);
+  border:1px solid rgba(48,209,88,0.2);
+  border-radius:50px;padding:6px 16px;
+  font-size:13px;font-weight:500;
+  color:rgba(245,245,247,0.7);
+  margin-bottom:24px;
+}
+.wizard-detected::before{
+  content:'';display:block;width:8px;height:8px;
+  border-radius:50%;background:#30D158;
+  box-shadow:0 0 6px rgba(48,209,88,0.5);
+}
+.wizard-unsupported{
+  text-align:center;padding:32px 24px;
+  background:rgba(255,69,58,0.08);
+  border:1px solid rgba(255,69,58,0.15);
+  border-radius:16px;
+  color:rgba(245,245,247,0.7);font-size:15px;line-height:1.7;
+}
+.wizard-step{
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:12px;padding:20px 24px;
+  margin-bottom:12px;
+}
+.wizard-step-num{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:28px;height:28px;border-radius:50%;
+  background:rgba(10,132,255,0.15);
+  color:#0A84FF;font-size:13px;font-weight:700;
+  margin-right:12px;flex-shrink:0;
+}
+.wizard-step-title{
+  font-size:16px;font-weight:600;
+  color:rgba(245,245,247,0.85);
+  display:flex;align-items:center;
+  margin-bottom:12px;
+}
+.wizard-command{
+  position:relative;
+  background:rgba(0,0,0,0.35);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:8px;padding:14px 48px 14px 16px;
+  font-family:'SF Mono','Fira Code',monospace;
+  font-size:13px;line-height:1.6;
+  color:rgba(245,245,247,0.75);
+  overflow-x:auto;white-space:pre-wrap;word-break:break-all;
+}
+.copy-btn{
+  position:absolute;top:8px;right:8px;
+  padding:4px 10px;border-radius:6px;
+  font-size:11px;font-weight:600;
+  color:rgba(245,245,247,0.4);
+  background:rgba(255,255,255,0.06);
+  transition:all 0.2s ease;
+  cursor:pointer;
+}
+@media(hover:hover){.copy-btn:hover{color:#F5F5F7;background:rgba(255,255,255,0.1)}}
+.copy-btn.copied{color:#30D158;background:rgba(48,209,88,0.15)}
+
 .faq-section{margin-top:48px}
 .faq-item{margin-bottom:24px}
 .faq-item h4{font-size:16px;font-weight:600;margin-bottom:8px;color:rgba(245,245,247,0.85)}
@@ -688,6 +858,175 @@ main{position:relative;z-index:1;min-height:100vh;min-height:100dvh}
   .dash-content{padding:68px 12px 40px}
 }
 
+/* ── Device Chooser (Step 0) ──────────────────────────────────────────────── */
+.device-chooser{
+  max-width:640px;margin:0 auto 48px;
+  animation:fadeSlideUp 0.4s ease;
+}
+.device-chooser h3{
+  font-size:20px;font-weight:600;margin-bottom:8px;
+  color:rgba(245,245,247,0.9);text-align:center;
+}
+.device-chooser>p{
+  font-size:15px;color:rgba(245,245,247,0.45);
+  margin-bottom:24px;text-align:center;
+}
+.device-chooser-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:12px;
+}
+.device-choose-card{
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:16px;padding:24px 20px;
+  text-align:center;cursor:pointer;
+  transition:all 0.3s ease;
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+}
+@media(hover:hover){.device-choose-card:hover{
+  background:rgba(255,255,255,0.06);
+  border-color:rgba(255,255,255,0.15);
+  transform:translateY(-2px);
+}}
+.device-choose-card .device-choose-icon{font-size:32px;line-height:1}
+.device-choose-card .device-choose-name{
+  font-size:16px;font-weight:600;color:rgba(245,245,247,0.85);
+}
+.device-choose-card .device-choose-role{
+  font-size:12px;font-weight:600;
+  padding:2px 10px;border-radius:50px;
+  display:inline-block;
+}
+.device-choose-role.inference{
+  background:rgba(10,132,255,0.15);color:#0A84FF;
+}
+.device-choose-role.monitor{
+  background:rgba(255,214,10,0.15);color:#FFD60A;
+}
+@media(max-width:480px){
+  .device-chooser-grid{grid-template-columns:1fr;max-width:320px;margin:0 auto}
+}
+
+/* ── Monitor Status ──────────────────────────────────────────────────────── */
+.monitor-status-card{
+  background:rgba(48,209,88,0.06);
+  border:1px solid rgba(48,209,88,0.2);
+  border-radius:16px;padding:32px 24px;
+  text-align:center;
+  animation:fadeSlideUp 0.4s ease;
+}
+.monitor-pulse{
+  display:inline-flex;align-items:center;gap:10px;
+  font-size:18px;font-weight:600;color:#30D158;
+  margin-bottom:16px;
+}
+.monitor-pulse-dot{
+  width:12px;height:12px;border-radius:50%;
+  background:#30D158;
+  box-shadow:0 0 8px rgba(48,209,88,0.5);
+  animation:pulse-monitor 2s ease infinite;
+}
+@keyframes pulse-monitor{
+  0%,100%{box-shadow:0 0 8px rgba(48,209,88,0.5)}
+  50%{box-shadow:0 0 20px rgba(48,209,88,0.8)}
+}
+.monitor-node-id{
+  font-family:'SF Mono','Fira Code',monospace;
+  font-size:13px;color:rgba(245,245,247,0.4);
+  margin-bottom:20px;
+}
+.monitor-stop-btn{
+  padding:10px 28px;border-radius:50px;
+  font-size:14px;font-weight:600;
+  color:rgba(245,245,247,0.6);
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.1);
+  transition:all 0.2s ease;
+}
+@media(hover:hover){.monitor-stop-btn:hover{
+  color:#FF453A;border-color:rgba(255,69,58,0.3);
+  background:rgba(255,69,58,0.1);
+}}
+.monitor-badge{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(48,209,88,0.1);
+  border:1px solid rgba(48,209,88,0.2);
+  border-radius:50px;padding:6px 16px;
+  font-size:13px;font-weight:500;
+  color:rgba(245,245,247,0.7);
+  margin-bottom:24px;
+}
+.monitor-badge::before{
+  content:'';display:block;width:8px;height:8px;
+  border-radius:50%;background:#30D158;
+  box-shadow:0 0 6px rgba(48,209,88,0.5);
+}
+.start-monitor-btn{
+  display:block;margin:24px auto 0;
+  padding:16px 48px;
+  font-size:18px;font-weight:600;
+  color:#fff;
+  background:linear-gradient(135deg,#30D158 0%,#34C759 100%);
+  border-radius:50px;
+  box-shadow:0 0 24px rgba(48,209,88,0.3),0 0 64px rgba(52,199,89,0.15);
+  transition:all 0.3s ease;
+}
+@media(hover:hover){.start-monitor-btn:hover{
+  transform:translateY(-2px);
+  box-shadow:0 0 32px rgba(48,209,88,0.5),0 0 80px rgba(52,199,89,0.25);
+}}
+.start-monitor-btn:active{transform:scale(0.97)}
+.monitor-explain{
+  font-size:14px;color:rgba(245,245,247,0.5);
+  line-height:1.7;margin-bottom:20px;text-align:left;
+}
+.monitor-substep{
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:12px;padding:16px 20px;
+  margin-bottom:10px;text-align:left;
+}
+.monitor-substep-title{
+  font-size:14px;font-weight:600;
+  color:rgba(245,245,247,0.75);
+  display:flex;align-items:center;gap:8px;margin-bottom:8px;
+}
+.monitor-substep-num{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:22px;height:22px;border-radius:50%;
+  background:rgba(48,209,88,0.15);
+  color:#30D158;font-size:11px;font-weight:700;flex-shrink:0;
+}
+.monitor-substep p{
+  font-size:13px;color:rgba(245,245,247,0.45);line-height:1.6;
+}
+
+/* ── Power Mode Selector (in wizard Step 3) ──────────────────────────────── */
+.power-selector{margin-bottom:24px}
+.power-selector-label{
+  font-size:14px;font-weight:600;
+  color:rgba(245,245,247,0.6);margin-bottom:12px;
+  text-align:left;
+}
+.power-selector-options{display:flex;gap:8px;flex-wrap:wrap}
+.power-option{
+  flex:1;min-width:140px;
+  background:rgba(255,255,255,0.03);
+  border:2px solid rgba(255,255,255,0.08);
+  border-radius:12px;padding:14px 12px;
+  text-align:center;cursor:pointer;
+  transition:all 0.2s ease;
+}
+@media(hover:hover){.power-option:hover{
+  background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.15);
+}}
+.power-option.selected{
+  border-color:rgba(10,132,255,0.5);
+  background:rgba(10,132,255,0.08);
+}
+.power-option-icon{font-size:20px;margin-bottom:4px}
+.power-option-name{font-size:13px;font-weight:600;color:rgba(245,245,247,0.8)}
+.power-option-desc{font-size:11px;color:rgba(245,245,247,0.35);margin-top:2px}
+
 /* ── Shared ───────────────────────────────────────────────────────────────── */
 .section-divider{
   height:1px;background:rgba(255,255,255,0.06);
@@ -737,11 +1076,73 @@ main{position:relative;z-index:1;min-height:100vh;min-height:100dvh}
 @media(min-width:769px){
   .mobile-menu{display:none!important}
 }
+/* ── Token Card ───────────────────────────────────────────────────────── */
+.google-signin-wrap{
+  display:flex;justify-content:center;margin:16px 0;
+}
+.token-card{
+  background:rgba(48,209,88,0.06);
+  border:1px solid rgba(48,209,88,0.2);
+  border-radius:16px;padding:28px 24px;
+  margin-top:24px;animation:fadeSlideUp 0.4s ease;
+  text-align:left;
+}
+.token-card-header{
+  display:flex;align-items:center;gap:12px;
+  margin-bottom:20px;
+}
+.token-card-avatar{
+  width:40px;height:40px;border-radius:50%;
+  background:rgba(255,255,255,0.1);
+}
+.token-card-name{
+  font-size:17px;font-weight:600;color:rgba(245,245,247,0.9);
+}
+.token-card-email{
+  font-size:13px;color:rgba(245,245,247,0.4);
+}
+.token-card-label{
+  font-size:12px;font-weight:600;letter-spacing:0.04em;
+  text-transform:uppercase;color:rgba(245,245,247,0.35);
+  margin-bottom:8px;
+}
+.token-card-value{
+  position:relative;
+  background:rgba(0,0,0,0.35);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:8px;padding:14px 60px 14px 16px;
+  font-family:'SF Mono','Fira Code',monospace;
+  font-size:14px;color:#30D158;
+  word-break:break-all;line-height:1.5;
+}
+.token-card-value .copy-btn{
+  position:absolute;top:10px;right:8px;
+}
+.token-card-hint{
+  margin-top:12px;font-size:13px;
+  color:rgba(245,245,247,0.4);line-height:1.6;
+}
+.token-card-actions{
+  margin-top:16px;display:flex;gap:12px;flex-wrap:wrap;
+}
+.token-revoke-btn{
+  padding:8px 16px;border-radius:8px;
+  font-size:13px;font-weight:500;
+  color:rgba(255,69,58,0.7);
+  background:rgba(255,69,58,0.08);
+  border:1px solid rgba(255,69,58,0.15);
+  transition:all 0.2s ease;
+}
+@media(hover:hover){.token-revoke-btn:hover{
+  color:#FF453A;background:rgba(255,69,58,0.15);
+}}
+
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:0.01ms!important;transition-duration:0.01ms!important}
   #stars-canvas{display:none}
 }
 </style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -860,6 +1261,77 @@ main{position:relative;z-index:1;min-height:100vh;min-height:100dvh}
       <h1>Contribute Your Device</h1>
       <p>Plug it in. Connect it. It contributes. That simple.</p>
     </div>
+    <div class="contribute-wizard" id="contribute-wizard">
+      <div class="device-chooser" id="device-chooser">
+        <h3>What device are you contributing?</h3>
+        <p>Every piece of hardware fits somewhere in the puzzle.</p>
+        <div class="device-chooser-grid">
+          <div class="device-choose-card" onclick="selectDevice('iphone')">
+            <div class="device-choose-icon">&#128241;</div>
+            <div class="device-choose-name">iPhone / iPad</div>
+            <div class="device-choose-role monitor">Monitor Node</div>
+          </div>
+          <div class="device-choose-card" onclick="selectDevice('android')">
+            <div class="device-choose-icon">&#128242;</div>
+            <div class="device-choose-name">Android Phone</div>
+            <div class="device-choose-role inference">AI Node</div>
+          </div>
+          <div class="device-choose-card" onclick="selectDevice('desktop')">
+            <div class="device-choose-icon">&#128187;</div>
+            <div class="device-choose-name">Mac / Windows / Linux</div>
+            <div class="device-choose-role inference">AI Node</div>
+          </div>
+          <div class="device-choose-card" onclick="selectDevice('pi')">
+            <div class="device-choose-icon">&#129302;</div>
+            <div class="device-choose-name">Raspberry Pi</div>
+            <div class="device-choose-role inference">AI Node</div>
+          </div>
+        </div>
+      </div>
+      <div class="wizard-progress" id="wizard-progress" style="display:none">
+        <div class="wizard-progress-step" id="wp-1"><span>1</span> Get Token</div>
+        <div class="wizard-progress-line" id="wpl-1"></div>
+        <div class="wizard-progress-step" id="wp-2"><span>2</span> Your Token</div>
+        <div class="wizard-progress-line" id="wpl-2"></div>
+        <div class="wizard-progress-step" id="wp-3"><span>3</span> Start</div>
+      </div>
+      <div class="wiz-step" id="wiz-step-1">
+        <h3>Get Your Token</h3>
+        <p>Sign in to generate a unique contributor token for your device.</p>
+        <div class="google-signin-wrap">
+          <div id="g_id_onload"
+            data-client_id=""
+            data-callback="handleGoogleSignIn"
+            data-auto_prompt="false">
+          </div>
+          <div class="g_id_signin"
+            data-type="standard"
+            data-shape="pill"
+            data-theme="filled_black"
+            data-text="signin_with"
+            data-size="large"
+            data-logo_alignment="left">
+          </div>
+        </div>
+        <div class="wiz-alt-token">
+          <button class="wiz-alt-toggle" onclick="toggleManualToken()">Already have a token?</button>
+          <div class="wiz-alt-input" id="wiz-alt-input" style="display:none">
+            <input type="text" id="manual-token-input" placeholder="Paste your token here..." maxlength="128">
+            <button onclick="pasteToken()">Use Token</button>
+          </div>
+        </div>
+      </div>
+      <div class="wiz-step" id="wiz-step-2">
+        <div id="wiz-token-card"></div>
+        <button class="wiz-next-btn" onclick="advanceWizard(3)">Next &mdash; Get Setup Command</button>
+        <button class="wiz-link-btn" onclick="useAnotherAccount()">Use a different account</button>
+      </div>
+      <div class="wiz-step" id="wiz-step-3">
+        <div id="wiz-setup-content">
+          <div class="wiz-loading">Detecting your device...</div>
+        </div>
+      </div>
+    </div>
     <h2 class="section-title">Power Modes</h2>
     <p style="color:rgba(245,245,247,0.5);margin-bottom:24px;font-size:15px">You choose how much to give. Switch anytime.</p>
     <div class="power-modes">
@@ -885,6 +1357,7 @@ main{position:relative;z-index:1;min-height:100vh;min-height:100dvh}
     <div class="section-divider"></div>
     <h2 class="section-title">What Can Join?</h2>
     <div class="device-grid">
+      <div class="device-tag">iPhone / iPad (Monitor)</div>
       <div class="device-tag">Android Phones</div>
       <div class="device-tag">Raspberry Pi (1GB+)</div>
       <div class="device-tag">Old Laptops</div>
@@ -893,8 +1366,21 @@ main{position:relative;z-index:1;min-height:100vh;min-height:100dvh}
       <div class="device-tag">Any device with Ollama</div>
     </div>
     <div class="section-divider"></div>
-    <h2 class="section-title">Setup Guides</h2>
+    <h2 class="section-title">Detailed Setup Guides</h2>
     <div class="setup-guides">
+      <div class="setup-item">
+        <div class="setup-header" onclick="toggleSetup(this)">
+          <span>iPhone / iPad (Monitor Node)</span>
+          <span class="setup-chevron">&#9660;</span>
+        </div>
+        <div class="setup-body"><div class="setup-body-inner">
+          <p>iPhones and iPads can't run Ollama, but they're perfect as <strong>monitor nodes</strong> &mdash; they track which devices are online, network health, and response times.</p>
+          <p><strong>1.</strong> Open this page on your iPhone/iPad in Safari</p>
+          <p><strong>2.</strong> Tap <strong>Share</strong> &rarr; <strong>"Add to Home Screen"</strong> to install as a PWA</p>
+          <p><strong>3.</strong> Choose "iPhone / iPad" from the device picker at the top, sign in, and tap "Start Monitoring"</p>
+          <p>Your device will heartbeat every 30 seconds to keep its spot in the network. No battery drain &mdash; it's just a tiny HTTP request.</p>
+        </div></div>
+      </div>
       <div class="setup-item">
         <div class="setup-header" onclick="toggleSetup(this)">
           <span>Android (Termux + Ollama)</span>
@@ -921,7 +1407,7 @@ NODE_SECRET=YOUR_TOKEN \
 MODEL=qwen3:1.7b \
 node wattson-client.js</pre>
           <p>The client registers your device, polls for questions, runs them on your local Ollama, and sends answers back. It runs until you stop it (Ctrl+C).</p>
-          <p>Don't have a token? <a href="https://github.com/chatde/wattson-me/issues" target="_blank" rel="noopener">Request one here</a>.</p>
+          <p>Don't have a token? <a href="/start" onclick="event.preventDefault();navigateTo('/start');window.scrollTo(0,0)">Sign in with Google</a> at the top of this page to get one.</p>
         </div></div>
       </div>
       <div class="setup-item">
@@ -948,7 +1434,7 @@ NODE_SECRET=YOUR_TOKEN \
 MODEL=qwen3:1.7b \
 node wattson-client.js</pre>
           <p>The client handles everything: registration, polling for questions, running Ollama, and sending answers back.</p>
-          <p>Don't have a token? <a href="https://github.com/chatde/wattson-me/issues" target="_blank" rel="noopener">Request one here</a>.</p>
+          <p>Don't have a token? <a href="/start" onclick="event.preventDefault();navigateTo('/start');window.scrollTo(0,0)">Sign in with Google</a> at the top of this page to get one.</p>
         </div></div>
       </div>
       <div class="setup-item">
@@ -973,7 +1459,7 @@ NODE_SECRET=YOUR_TOKEN \
 MODEL=llama3.1:8b-q4 \
 node wattson-client.js</pre>
           <p>The client handles everything: registration, polling for questions, running Ollama, and sending answers back.</p>
-          <p>Don't have a token? <a href="https://github.com/chatde/wattson-me/issues" target="_blank" rel="noopener">Request one here</a>.</p>
+          <p>Don't have a token? <a href="/start" onclick="event.preventDefault();navigateTo('/start');window.scrollTo(0,0)">Sign in with Google</a> at the top of this page to get one.</p>
         </div></div>
       </div>
       <div class="setup-item">
@@ -995,7 +1481,7 @@ $env:NODE_SECRET="YOUR_TOKEN"
 $env:MODEL="llama3.1:8b-q4"
 node wattson-client.js</pre>
           <p>The client handles everything: registration, polling for questions, running Ollama, and sending answers back.</p>
-          <p>Don't have a token? <a href="https://github.com/chatde/wattson-me/issues" target="_blank" rel="noopener">Request one here</a>.</p>
+          <p>Don't have a token? <a href="/start" onclick="event.preventDefault();navigateTo('/start');window.scrollTo(0,0)">Sign in with Google</a> at the top of this page to get one.</p>
         </div></div>
       </div>
     </div>
@@ -1806,6 +2292,473 @@ function toggleSetup(header) {
   }
   if (!isOpen) { item.classList.add('open'); body.style.maxHeight = body.scrollHeight + 'px'; }
 }
+
+var selectedDevice = null;
+
+function selectDevice(device) {
+  selectedDevice = device;
+  // Hide device chooser, show wizard progress + Step 1
+  var chooser = document.getElementById('device-chooser');
+  var progress = document.getElementById('wizard-progress');
+  if (chooser) chooser.style.display = 'none';
+  if (progress) progress.style.display = 'flex';
+  advanceWizard(1);
+}
+
+function loadWizardStep3() {
+  var content = document.getElementById('wiz-setup-content');
+  if (!content) return;
+  content.innerHTML = '<div class="wiz-loading">Detecting your device...</div>';
+
+  var setupUrl = '/api/setup';
+  if (selectedDevice) setupUrl += '?device=' + encodeURIComponent(selectedDevice);
+
+  fetch(setupUrl)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      content.innerHTML = '';
+
+      // Monitor role (iPhone/iPad)
+      if (data.role === 'monitor') {
+        var badge = document.createElement('div');
+        badge.className = 'monitor-badge';
+        badge.textContent = 'iPhone / iPad \u2014 Monitor Node';
+        content.appendChild(badge);
+
+        var explain = document.createElement('p');
+        explain.className = 'monitor-explain';
+        explain.textContent = data.message || 'Your device becomes a network monitor node.';
+        content.appendChild(explain);
+
+        // Sub-step 1: Add to Home Screen
+        var sub1 = document.createElement('div');
+        sub1.className = 'monitor-substep';
+        sub1.innerHTML = '<div class="monitor-substep-title"><span class="monitor-substep-num">1</span>Add to Home Screen</div>' +
+          '<p>In Safari: tap Share \u2192 "Add to Home Screen". This installs Wattson as a PWA for a native app experience.</p>';
+        content.appendChild(sub1);
+
+        // Sub-step 2: Start Monitoring button
+        var sub2 = document.createElement('div');
+        sub2.className = 'monitor-substep';
+        sub2.innerHTML = '<div class="monitor-substep-title"><span class="monitor-substep-num">2</span>Start Monitoring</div>' +
+          '<p>Once installed, tap the button below to activate your monitor node.</p>';
+        content.appendChild(sub2);
+
+        var btn = document.createElement('button');
+        btn.className = 'start-monitor-btn';
+        btn.textContent = 'Start Monitoring';
+        btn.onclick = startMonitoring;
+        content.appendChild(btn);
+        return;
+      }
+
+      if (!data.supported) {
+        content.innerHTML = '<div class="wizard-unsupported">' +
+          (data.message || 'This device is not supported yet. Check the detailed guides below.') + '</div>';
+        return;
+      }
+
+      var osNames = { mac: 'Mac', windows: 'Windows', linux: 'Linux', android: 'Android', unknown: 'Your Device' };
+      var badge = document.createElement('div');
+      badge.className = 'wizard-detected';
+      badge.textContent = 'Detected: ' + (osNames[data.os] || data.os);
+      content.appendChild(badge);
+
+      // Power mode selector
+      var selector = document.createElement('div');
+      selector.className = 'power-selector';
+      selector.innerHTML =
+        '<div class="power-selector-label">Choose your power mode:</div>' +
+        '<div class="power-selector-options">' +
+          '<div class="power-option selected" data-mode="FULL_FORCE" onclick="selectPowerMode(this)">' +
+            '<div class="power-option-icon">&#9889;</div>' +
+            '<div class="power-option-name">Full Force</div>' +
+            '<div class="power-option-desc">100% dedicated</div>' +
+          '</div>' +
+          '<div class="power-option" data-mode="HALF_FORCE" onclick="selectPowerMode(this)">' +
+            '<div class="power-option-icon">&#9881;</div>' +
+            '<div class="power-option-name">Half Force</div>' +
+            '<div class="power-option-desc">Share resources</div>' +
+          '</div>' +
+          '<div class="power-option" data-mode="ECO" onclick="selectPowerMode(this)">' +
+            '<div class="power-option-icon">&#127807;</div>' +
+            '<div class="power-option-name">Eco</div>' +
+            '<div class="power-option-desc">Idle only</div>' +
+          '</div>' +
+        '</div>';
+      content.appendChild(selector);
+
+      // Commands container — re-rendered when power mode changes
+      var cmdsContainer = document.createElement('div');
+      cmdsContainer.id = 'wiz-commands-container';
+      content.appendChild(cmdsContainer);
+
+      // Store data for re-rendering on power mode change
+      window._wizSetupData = data;
+      renderSetupCommands(data, cmdsContainer);
+    })
+    .catch(function() {
+      content.innerHTML = '<div style="text-align:center;color:rgba(245,245,247,0.4);padding:24px">' +
+        'Could not detect your device. Check the detailed guides below.</div>';
+    });
+}
+
+var selectedPowerMode = 'FULL_FORCE';
+
+function selectPowerMode(el) {
+  var opts = el.parentElement.querySelectorAll('.power-option');
+  for (var i = 0; i < opts.length; i++) opts[i].classList.remove('selected');
+  el.classList.add('selected');
+  selectedPowerMode = el.getAttribute('data-mode');
+  // Re-render commands with new power mode
+  var container = document.getElementById('wiz-commands-container');
+  if (container && window._wizSetupData) {
+    renderSetupCommands(window._wizSetupData, container);
+  }
+}
+
+function renderSetupCommands(data, container) {
+  container.innerHTML = '';
+  var token = contributorToken || 'YOUR_TOKEN';
+  var pmEnv = 'POWER_MODE=' + selectedPowerMode;
+
+  if (data.quickCommand) {
+    var cmd = data.quickCommand.replace(/YOUR_TOKEN/g, token);
+    var block = document.createElement('div');
+    block.className = 'wizard-step';
+    block.style.borderColor = 'rgba(10,132,255,0.2)';
+    block.style.background = 'rgba(10,132,255,0.05)';
+    var termLabel = data.os === 'android' ? 'Paste this into Termux' : 'Paste this into your terminal';
+    block.innerHTML = '<div class="wizard-step-title" style="color:#0A84FF">' +
+      termLabel + '</div>' +
+      '<div class="wizard-command" style="font-size:15px"><button class="copy-btn" onclick="copyCommand(this)">Copy</button>' +
+      escapeHtml(cmd) + '</div>' +
+      '<div style="margin-top:12px;font-size:13px;color:rgba(245,245,247,0.4)">Auto-detects your device, installs Ollama, picks the best model, and downloads the client.</div>';
+    container.appendChild(block);
+  }
+
+  if (data.steps && data.steps.length > 0) {
+    if (data.quickCommand) {
+      var divider = document.createElement('div');
+      divider.style.cssText = 'text-align:center;margin:24px 0 16px;font-size:13px;color:rgba(245,245,247,0.25)';
+      divider.textContent = 'Or follow the steps manually:';
+      container.appendChild(divider);
+    }
+    for (var i = 0; i < data.steps.length; i++) {
+      var step = data.steps[i];
+      var stepCmd = step.command.replace(/YOUR_TOKEN/g, token);
+      // Inject POWER_MODE into the "Start contributing" step
+      if (step.title.toLowerCase().indexOf('start') !== -1 || step.title.toLowerCase().indexOf('contributing') !== -1) {
+        stepCmd = stepCmd.replace(/(NODE_SECRET=)/,pmEnv + ' \\\n$1');
+      }
+      var div = document.createElement('div');
+      div.className = 'wizard-step';
+      div.innerHTML = '<div class="wizard-step-title"><span class="wizard-step-num">' + (i + 1) + '</span>' +
+        step.title + '</div>' +
+        '<div class="wizard-command"><button class="copy-btn" onclick="copyCommand(this)">Copy</button>' +
+        escapeHtml(stepCmd) + '</div>';
+      container.appendChild(div);
+    }
+  }
+}
+
+// ── Monitor Client ────────────────────────────────────────────────────────
+
+var monitorHeartbeatInterval = null;
+
+function startMonitoring() {
+  var token = contributorToken;
+  if (!token) { showError('Please sign in first to get a token'); return; }
+
+  fetch('/api/nodes/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Node-Secret': token },
+    body: JSON.stringify({ name: 'iPhone Monitor', role: 'monitor', type: 'iphone' }),
+  })
+  .then(function(r) { return r.json().then(function(d) { return { status: r.status, data: d }; }); })
+  .then(function(r) {
+    if (r.status !== 201) {
+      showError(r.data.error || 'Could not register monitor node');
+      return;
+    }
+    var nodeId = r.data.node.id;
+    localStorage.setItem('wattson_node_id', nodeId);
+    localStorage.setItem('wattson_monitor_active', 'true');
+    startHeartbeat(token, nodeId);
+    showMonitorStatus(nodeId);
+  })
+  .catch(function() { showError('Network error. Please try again.'); });
+}
+
+function startHeartbeat(token, nodeId) {
+  if (monitorHeartbeatInterval) clearInterval(monitorHeartbeatInterval);
+
+  function doPoll() {
+    fetch('/api/nodes/poll', {
+      headers: { 'X-Node-Secret': token, 'X-Node-Id': nodeId },
+    })
+    .then(function(r) {
+      if (r.status === 401) {
+        // Stale node ID — auto-stop and prompt re-registration
+        stopMonitoring();
+        showError('Monitor session expired. Please start monitoring again.');
+      }
+    })
+    .catch(function() { /* Network error — keep trying */ });
+  }
+
+  doPoll(); // Immediate first heartbeat
+  monitorHeartbeatInterval = setInterval(doPoll, 30000);
+}
+
+function showMonitorStatus(nodeId) {
+  var content = document.getElementById('wiz-setup-content');
+  if (!content) return;
+  content.innerHTML =
+    '<div class="monitor-status-card">' +
+      '<div class="monitor-pulse"><span class="monitor-pulse-dot"></span> Monitoring Active</div>' +
+      '<div class="monitor-node-id">Node: ' + esc(nodeId) + '</div>' +
+      '<button class="monitor-stop-btn" onclick="stopMonitoring()">Stop Monitoring</button>' +
+    '</div>';
+}
+
+function stopMonitoring() {
+  if (monitorHeartbeatInterval) {
+    clearInterval(monitorHeartbeatInterval);
+    monitorHeartbeatInterval = null;
+  }
+  localStorage.removeItem('wattson_node_id');
+  localStorage.removeItem('wattson_monitor_active');
+  // Reload Step 3
+  loadWizardStep3();
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function copyCommand(btn) {
+  var code = btn.parentElement.textContent.replace('Copy', '').replace('Copied!', '').trim();
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(code).then(function() {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+    });
+  }
+}
+
+// ── Google Sign-In & Token Management ─────────────────────────────────────
+
+var contributorToken = localStorage.getItem('wattson_token') || null;
+var contributorName = localStorage.getItem('wattson_name') || null;
+
+function handleGoogleSignIn(response) {
+  fetch('/api/auth/google', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ credential: response.credential }),
+  })
+  .then(function(r) { return r.json().then(function(d) { return { status: r.status, data: d }; }); })
+  .then(function(r) {
+    if (r.status !== 200) {
+      showError(r.data.error || 'Sign-in failed');
+      return;
+    }
+    contributorToken = r.data.token;
+    contributorName = r.data.name;
+    localStorage.setItem('wattson_token', r.data.token);
+    localStorage.setItem('wattson_name', r.data.name);
+    localStorage.setItem('wattson_email', r.data.email);
+    showTokenCard(r.data.token, r.data.name, r.data.email);
+    advanceWizard(2);
+  })
+  .catch(function() {
+    showError('Could not complete sign-in. Try again.');
+  });
+}
+
+function showTokenCard(token, name, email) {
+  var cardEl = document.getElementById('wiz-token-card');
+  if (!cardEl) return;
+
+  cardEl.innerHTML =
+    '<div class="token-card">' +
+      '<div class="token-card-header">' +
+        '<div class="token-card-avatar" style="background:rgba(48,209,88,0.2);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#30D158">' +
+          esc((name || '?').charAt(0).toUpperCase()) +
+        '</div>' +
+        '<div>' +
+          '<div class="token-card-name">Welcome' + (name ? ', ' + esc(name) : '') + '!</div>' +
+          (email ? '<div class="token-card-email">' + esc(email) + '</div>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div class="token-card-label">Your Contributor Token</div>' +
+      '<div class="token-card-value" id="token-display">' +
+        '<button class="copy-btn" onclick="copyToken()">Copy</button>' +
+        esc(token) +
+      '</div>' +
+      '<div class="token-card-hint">Use this as your <code>NODE_SECRET</code> when running the client. It\'s saved in your browser for next time.</div>' +
+      '<div class="token-card-actions">' +
+        '<button class="token-revoke-btn" onclick="revokeToken()">Revoke Token</button>' +
+      '</div>' +
+    '</div>';
+}
+
+function copyToken() {
+  if (!contributorToken || !navigator.clipboard) return;
+  navigator.clipboard.writeText(contributorToken).then(function() {
+    var btn = document.querySelector('#token-display .copy-btn');
+    if (btn) {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+    }
+  });
+}
+
+function revokeToken() {
+  if (!contributorToken) return;
+  fetch('/api/auth/revoke', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + contributorToken },
+  })
+  .then(function() {
+    contributorToken = null;
+    contributorName = null;
+    localStorage.removeItem('wattson_token');
+    localStorage.removeItem('wattson_name');
+    localStorage.removeItem('wattson_email');
+    var cardEl = document.getElementById('wiz-token-card');
+    if (cardEl) cardEl.innerHTML = '';
+    advanceWizard(1);
+  })
+  .catch(function() { showError('Could not revoke token. Try again.'); });
+}
+
+var wizardStep = 1;
+
+function advanceWizard(step) {
+  wizardStep = step;
+  for (var i = 1; i <= 3; i++) {
+    var stepEl = document.getElementById('wp-' + i);
+    var lineEl = document.getElementById('wpl-' + (i - 1));
+    if (stepEl) {
+      stepEl.classList.remove('active', 'completed');
+      if (i < step) stepEl.classList.add('completed');
+      else if (i === step) stepEl.classList.add('active');
+    }
+    if (lineEl) lineEl.classList.toggle('active', i <= step);
+  }
+  for (var j = 1; j <= 3; j++) {
+    var panel = document.getElementById('wiz-step-' + j);
+    if (panel) panel.classList.toggle('active', j === step);
+  }
+  if (step === 3) loadWizardStep3();
+}
+
+function toggleManualToken() {
+  var el = document.getElementById('wiz-alt-input');
+  if (el) el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+}
+
+function pasteToken() {
+  var input = document.getElementById('manual-token-input');
+  var token = input ? input.value.trim() : '';
+  if (!token) { showError('Please paste a valid token'); return; }
+  contributorToken = token;
+  localStorage.setItem('wattson_token', token);
+  showTokenCard(token, null, null);
+  advanceWizard(2);
+}
+
+function useAnotherAccount() {
+  contributorToken = null;
+  contributorName = null;
+  localStorage.removeItem('wattson_token');
+  localStorage.removeItem('wattson_name');
+  localStorage.removeItem('wattson_email');
+  var cardEl = document.getElementById('wiz-token-card');
+  if (cardEl) cardEl.innerHTML = '';
+  advanceWizard(1);
+}
+
+function checkExistingToken() {
+  var token = localStorage.getItem('wattson_token');
+  if (!token) return;
+
+  fetch('/api/auth/me', {
+    headers: { 'Authorization': 'Bearer ' + token },
+  })
+  .then(function(r) {
+    if (r.status !== 200) throw new Error('Invalid');
+    return r.json();
+  })
+  .then(function(data) {
+    contributorToken = token;
+    contributorName = data.name;
+    showTokenCard(token, data.name, data.email);
+    advanceWizard(2);
+  })
+  .catch(function() {
+    // Token invalid, clear it
+    localStorage.removeItem('wattson_token');
+    localStorage.removeItem('wattson_name');
+    localStorage.removeItem('wattson_email');
+    contributorToken = null;
+    contributorName = null;
+  });
+}
+
+// Check for returning visitors
+checkExistingToken();
+
+// Auto-resume monitor on return visit
+(function() {
+  var monActive = localStorage.getItem('wattson_monitor_active');
+  var monNodeId = localStorage.getItem('wattson_node_id');
+  var monToken = localStorage.getItem('wattson_token');
+  if (monActive && monNodeId && monToken) {
+    selectedDevice = 'iphone';
+    // When navigating to /start, auto-advance to Step 3 and show status
+    var origNav = window.navigateTo;
+    function resumeMonitor() {
+      var chooser = document.getElementById('device-chooser');
+      var progress = document.getElementById('wizard-progress');
+      if (chooser) chooser.style.display = 'none';
+      if (progress) progress.style.display = 'flex';
+      wizardStep = 3;
+      advanceWizard(3);
+      // After loadWizardStep3 renders, replace with monitor status
+      setTimeout(function() {
+        startHeartbeat(monToken, monNodeId);
+        showMonitorStatus(monNodeId);
+      }, 100);
+    }
+    // If already on /start, resume immediately after DOM settles
+    if (window.location.pathname === '/start') {
+      setTimeout(resumeMonitor, 300);
+    }
+    // Hook into navigateTo for future navigation to /start
+    var _origNavigateTo = window.navigateTo;
+    if (_origNavigateTo) {
+      window.navigateTo = function(path) {
+        _origNavigateTo(path);
+        if (path === '/start') setTimeout(resumeMonitor, 300);
+      };
+    }
+  }
+})();
+
+// Inject Google Client ID from server config
+(function() {
+  fetch('/api/auth/config').then(function(r) { return r.json(); }).then(function(d) {
+    if (d.clientId) {
+      var el = document.getElementById('g_id_onload');
+      if (el) el.setAttribute('data-client_id', d.clientId);
+    }
+  }).catch(function() {});
+})();
 </script>
 </body>
 </html>

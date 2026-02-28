@@ -4,10 +4,31 @@
 // Nodes poll for work, process locally, post results back.
 
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { URL } = require('url');
+
+// ── Load .env (zero-dep dotenv) ─────────────────────────────────────────────
+
+try {
+  const envPath = path.join(__dirname, '.env');
+  if (fs.existsSync(envPath)) {
+    const lines = fs.readFileSync(envPath, 'utf8').split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const idx = trimmed.indexOf('=');
+      if (idx === -1) continue;
+      const key = trimmed.slice(0, idx).trim();
+      const val = trimmed.slice(idx + 1).trim();
+      if (!process.env[key]) process.env[key] = val;
+    }
+  }
+} catch {
+  // Non-critical
+}
 
 // ── Config ─────────────────────────────────────────────────────────────────────
 
@@ -25,9 +46,119 @@ const CONFIG = {
   jobCleanupIntervalMs: parseInt(process.env.JOB_CLEANUP_INTERVAL_MS || '60000', 10),
   maxQueueSize: parseInt(process.env.MAX_QUEUE_SIZE || '100', 10),
   nodeStaleMs: parseInt(process.env.NODE_STALE_MS || '120000', 10),
+  googleClientId: process.env.GOOGLE_CLIENT_ID || '',
 };
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
+const TOKENS_FILE = path.join(__dirname, 'tokens.json');
+
+// ── Token Storage ─────────────────────────────────────────────────────────────
+
+let contributorTokens = {};
+
+function loadTokens() {
+  try {
+    if (fs.existsSync(TOKENS_FILE)) {
+      contributorTokens = JSON.parse(fs.readFileSync(TOKENS_FILE, 'utf8'));
+    }
+  } catch {
+    contributorTokens = {};
+  }
+}
+
+function saveTokens() {
+  try {
+    fs.writeFileSync(TOKENS_FILE, JSON.stringify(contributorTokens, null, 2));
+  } catch {
+    // Non-critical
+  }
+}
+
+function generateToken() {
+  return 'wm_' + crypto.randomBytes(16).toString('hex');
+}
+
+loadTokens();
+
+// ── Google JWT Verification (zero dependencies) ──────────────────────────────
+
+let googleKeysCache = null;
+let googleKeysCacheTime = 0;
+const GOOGLE_KEYS_TTL = 3600000; // 1 hour
+
+function fetchGoogleKeys() {
+  return new Promise((resolve, reject) => {
+    https.get('https://www.googleapis.com/oauth2/v3/certs', (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          googleKeysCache = parsed.keys;
+          googleKeysCacheTime = Date.now();
+          resolve(googleKeysCache);
+        } catch (err) {
+          reject(new Error('Failed to parse Google keys'));
+        }
+      });
+      res.on('error', reject);
+    }).on('error', reject);
+  });
+}
+
+async function getGoogleKeys() {
+  if (googleKeysCache && (Date.now() - googleKeysCacheTime < GOOGLE_KEYS_TTL)) {
+    return googleKeysCache;
+  }
+  return fetchGoogleKeys();
+}
+
+function base64urlDecode(str) {
+  str = str.replace(/-/g, '+').replace(/_/g, '/');
+  while (str.length % 4) str += '=';
+  return Buffer.from(str, 'base64');
+}
+
+async function verifyGoogleJWT(token) {
+  const parts = token.split('.');
+  if (parts.length !== 3) throw new Error('Invalid JWT format');
+
+  // Decode header to get kid
+  const header = JSON.parse(base64urlDecode(parts[0]).toString('utf8'));
+  if (!header.kid) throw new Error('Missing kid in JWT header');
+
+  // Fetch Google's public keys
+  const keys = await getGoogleKeys();
+  const key = keys.find(k => k.kid === header.kid);
+  if (!key) throw new Error('Key not found for kid');
+
+  // Convert JWK to PEM
+  const pubKey = crypto.createPublicKey({ key, format: 'jwk' });
+
+  // Verify signature
+  const signedContent = parts[0] + '.' + parts[1];
+  const signature = base64urlDecode(parts[2]);
+  const isValid = crypto.createVerify('RSA-SHA256')
+    .update(signedContent)
+    .verify(pubKey, signature);
+
+  if (!isValid) throw new Error('Invalid signature');
+
+  // Decode and validate payload
+  const payload = JSON.parse(base64urlDecode(parts[1]).toString('utf8'));
+
+  if (payload.iss !== 'accounts.google.com' && payload.iss !== 'https://accounts.google.com') {
+    throw new Error('Invalid issuer');
+  }
+  if (payload.aud !== CONFIG.googleClientId) {
+    throw new Error('Invalid audience');
+  }
+  if (payload.exp * 1000 < Date.now()) {
+    throw new Error('Token expired');
+  }
+
+  return { email: payload.email, name: payload.name, picture: payload.picture };
+}
 
 // ── Registry (in-memory) ──────────────────────────────────────────────────────
 
@@ -164,6 +295,7 @@ const MIME_TYPES = {
   '.webp': 'image/webp',
   '.woff2': 'font/woff2',
   '.webmanifest': 'application/manifest+json',
+  '.sh': 'text/x-shellscript; charset=utf-8',
 };
 
 // ── Static File Server ──────────────────────────────────────────────────────
@@ -338,15 +470,30 @@ async function handleChat(req, res, clientIP) {
 // ── Node Authentication ─────────────────────────────────────────────────────
 
 function authenticateNode(req, res) {
-  if (!CONFIG.nodeSecret) {
+  if (!CONFIG.nodeSecret && Object.keys(contributorTokens).length === 0) {
     sendJSON(res, 403, { error: 'Node authentication is disabled' });
     return null;
   }
 
   const secret = req.headers['x-node-secret'];
-  if (!secret || secret !== CONFIG.nodeSecret) {
+  if (!secret) {
     sendJSON(res, 401, { error: 'Invalid or missing secret' });
     return null;
+  }
+
+  // Check master secret first, then contributor tokens
+  const isMaster = secret === CONFIG.nodeSecret;
+  const isContributor = !isMaster && contributorTokens[secret];
+
+  if (!isMaster && !isContributor) {
+    sendJSON(res, 401, { error: 'Invalid or missing secret' });
+    return null;
+  }
+
+  // Update lastUsed for contributor tokens
+  if (isContributor) {
+    contributorTokens[secret].lastUsed = new Date().toISOString();
+    saveTokens();
   }
 
   const nodeId = req.headers['x-node-id'];
@@ -373,6 +520,13 @@ function handlePoll(req, res) {
   // Update node liveness
   node.lastSeen = new Date().toISOString();
   node.status = 'online';
+
+  // Monitor nodes heartbeat but never get jobs
+  if (node.role === 'monitor') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
 
   // Find oldest pending job
   let oldestJob = null;
@@ -471,16 +625,22 @@ async function handleRegister(req, res) {
     return;
   }
 
-  // Check secret
-  if (!CONFIG.nodeSecret) {
+  // Check secret (master or contributor token)
+  if (!CONFIG.nodeSecret && Object.keys(contributorTokens).length === 0) {
     sendJSON(res, 403, { error: 'Registration is disabled' });
     return;
   }
 
   const secret = req.headers['x-node-secret'];
-  if (!secret || secret !== CONFIG.nodeSecret) {
+  if (!secret || (secret !== CONFIG.nodeSecret && !contributorTokens[secret])) {
     sendJSON(res, 401, { error: 'Invalid or missing secret' });
     return;
+  }
+
+  // Update lastUsed for contributor tokens
+  if (contributorTokens[secret]) {
+    contributorTokens[secret].lastUsed = new Date().toISOString();
+    saveTokens();
   }
 
   let body;
@@ -577,6 +737,118 @@ function handleNetwork(req, res) {
   });
 }
 
+// ── Setup (auto-detect device, return steps) ────────────────────────────────
+
+function handleSetup(req, res) {
+  const ua = req.headers['user-agent'] || '';
+
+  // Parse ?device= query param (allows frontend device chooser to override UA detection)
+  const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  const deviceParam = (urlObj.searchParams.get('device') || '').toLowerCase();
+
+  // Map device param to OS
+  const deviceToOS = {
+    iphone: 'ios', ipad: 'ios',
+    android: 'android',
+    mac: 'mac',
+    windows: 'windows',
+    linux: 'linux', pi: 'linux',
+  };
+
+  let os, device, supported, model, steps, message, role;
+
+  // If ?device= is set for iOS, return monitor role
+  if (deviceParam && deviceToOS[deviceParam] === 'ios') {
+    os = 'ios';
+    device = 'mobile';
+    supported = true;
+    role = 'monitor';
+    model = null;
+    steps = [
+      { title: 'Add to Home Screen', command: 'In Safari: tap Share → "Add to Home Screen". This installs Wattson as a PWA for a native app experience.' },
+    ];
+    message = 'Your iPhone becomes a network monitor node. It tracks which devices are online, network health, and response times — no Ollama needed.';
+  } else {
+    // Determine OS from device param or UA
+    const effectiveOS = deviceParam ? (deviceToOS[deviceParam] || null) : null;
+
+    if (effectiveOS === 'android' || (!effectiveOS && /Android/i.test(ua))) {
+      os = 'android';
+      device = 'mobile';
+      supported = true;
+      model = 'qwen3:1.7b';
+      steps = [
+        { title: 'Install Termux', command: 'Download Termux from F-Droid:\nhttps://f-droid.org/en/packages/com.termux/' },
+        { title: 'Install Ollama', command: 'pkg update && pkg install ollama && ollama serve &' },
+        { title: 'Pull a model', command: 'ollama pull qwen3:1.7b' },
+        { title: 'Start contributing', command: 'curl -O https://raw.githubusercontent.com/chatde/wattson-me/main/wattson-client.js\n\nWATTSON_SERVER=https://wattson.me \\\nNODE_SECRET=YOUR_TOKEN \\\nMODEL=qwen3:1.7b \\\nnode wattson-client.js' },
+      ];
+    } else if (effectiveOS === 'mac' || (!effectiveOS && /Macintosh/i.test(ua))) {
+      os = 'mac';
+      device = 'desktop';
+      supported = true;
+      model = 'llama3.1:8b-q4';
+      steps = [
+        { title: 'Install Ollama', command: 'brew install ollama' },
+        { title: 'Pull a model', command: 'ollama pull llama3.1:8b-q4' },
+        { title: 'Start contributing', command: 'curl -O https://raw.githubusercontent.com/chatde/wattson-me/main/wattson-client.js\n\nWATTSON_SERVER=https://wattson.me \\\nNODE_SECRET=YOUR_TOKEN \\\nMODEL=llama3.1:8b-q4 \\\nnode wattson-client.js' },
+      ];
+    } else if (effectiveOS === 'windows' || (!effectiveOS && /Windows/i.test(ua))) {
+      os = 'windows';
+      device = 'desktop';
+      supported = true;
+      model = 'llama3.1:8b-q4';
+      steps = [
+        { title: 'Install Ollama', command: 'Download from https://ollama.ai/download and install' },
+        { title: 'Pull a model', command: 'ollama pull llama3.1:8b-q4' },
+        { title: 'Start contributing', command: 'Invoke-WebRequest -Uri "https://raw.githubusercontent.com/chatde/wattson-me/main/wattson-client.js" -OutFile "wattson-client.js"\n\n$env:WATTSON_SERVER="https://wattson.me"\n$env:NODE_SECRET="YOUR_TOKEN"\n$env:MODEL="llama3.1:8b-q4"\nnode wattson-client.js' },
+      ];
+    } else if (effectiveOS === 'linux' || (!effectiveOS && /Linux/i.test(ua))) {
+      os = 'linux';
+      device = 'desktop';
+      supported = true;
+      model = 'qwen3:1.7b';
+      steps = [
+        { title: 'Install Ollama', command: 'curl -fsSL https://ollama.ai/install.sh | sh' },
+        { title: 'Pull a model', command: 'ollama pull qwen3:1.7b' },
+        { title: 'Start contributing', command: 'curl -O https://raw.githubusercontent.com/chatde/wattson-me/main/wattson-client.js\n\nWATTSON_SERVER=https://wattson.me \\\nNODE_SECRET=YOUR_TOKEN \\\nMODEL=qwen3:1.7b \\\nnode wattson-client.js' },
+      ];
+    } else if (!effectiveOS && /iPhone|iPad|iPod/i.test(ua)) {
+      // iOS without ?device= param — backward compatible: unsupported
+      os = 'ios';
+      device = 'mobile';
+      supported = false;
+      model = null;
+      steps = [];
+      message = 'iOS doesn\'t support Ollama yet. You can contribute using an Android phone, laptop, or desktop instead.';
+      role = 'inference';
+    } else {
+      os = 'unknown';
+      device = 'unknown';
+      supported = true;
+      model = 'qwen3:1.7b';
+      steps = [
+        { title: 'Install Ollama', command: 'curl -fsSL https://ollama.ai/install.sh | sh' },
+        { title: 'Pull a model', command: 'ollama pull qwen3:1.7b' },
+        { title: 'Start contributing', command: 'curl -O https://raw.githubusercontent.com/chatde/wattson-me/main/wattson-client.js\n\nWATTSON_SERVER=https://wattson.me \\\nNODE_SECRET=YOUR_TOKEN \\\nMODEL=qwen3:1.7b \\\nnode wattson-client.js' },
+      ];
+    }
+
+    if (!role) role = 'inference';
+  }
+
+  // Quick one-liner for bash-compatible platforms
+  let quickCommand = null;
+  if (supported && role === 'inference' && os !== 'windows') {
+    quickCommand = 'curl -fsSL https://wattson.me/setup.sh | bash';
+  }
+
+  const result = { os, device, supported, model, steps, role };
+  if (quickCommand) result.quickCommand = quickCommand;
+  if (message) result.message = message;
+  sendJSON(res, 200, result);
+}
+
 // ── Health ───────────────────────────────────────────────────────────────────
 
 function handleHealth(req, res) {
@@ -597,6 +869,141 @@ function handleHealth(req, res) {
     totalQueries: registry.totalQueries,
     uptime: process.uptime(),
   });
+}
+
+// ── Auth Endpoints ──────────────────────────────────────────────────────────
+
+async function handleAuthGoogle(req, res) {
+  if (req.method !== 'POST') {
+    sendJSON(res, 405, { error: 'Method not allowed' });
+    return;
+  }
+
+  if (!CONFIG.googleClientId) {
+    sendJSON(res, 503, { error: 'Google Sign-In is not configured' });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readBody(req);
+  } catch (err) {
+    sendJSON(res, 400, { error: err.message });
+    return;
+  }
+
+  if (!body.credential || typeof body.credential !== 'string') {
+    sendJSON(res, 400, { error: 'credential is required' });
+    return;
+  }
+
+  let googleUser;
+  try {
+    googleUser = await verifyGoogleJWT(body.credential);
+  } catch (err) {
+    sendJSON(res, 401, { error: 'Invalid Google credential: ' + err.message });
+    return;
+  }
+
+  // Check if this email already has a token
+  for (const [token, info] of Object.entries(contributorTokens)) {
+    if (info.email === googleUser.email) {
+      // Update profile info
+      info.name = googleUser.name;
+      info.picture = googleUser.picture;
+      info.lastUsed = new Date().toISOString();
+      saveTokens();
+      sendJSON(res, 200, { token, name: info.name, email: info.email });
+      return;
+    }
+  }
+
+  // Create new token
+  const token = generateToken();
+  contributorTokens[token] = {
+    email: googleUser.email,
+    name: googleUser.name,
+    picture: googleUser.picture,
+    createdAt: new Date().toISOString(),
+    lastUsed: new Date().toISOString(),
+  };
+  saveTokens();
+
+  sendJSON(res, 200, { token, name: googleUser.name, email: googleUser.email });
+}
+
+function handleAuthMe(req, res) {
+  if (req.method !== 'GET') {
+    sendJSON(res, 405, { error: 'Method not allowed' });
+    return;
+  }
+
+  const authHeader = req.headers['authorization'];
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    sendJSON(res, 401, { error: 'Missing or invalid Authorization header' });
+    return;
+  }
+
+  const token = authHeader.slice(7);
+  const info = contributorTokens[token];
+  if (!info) {
+    sendJSON(res, 401, { error: 'Invalid token' });
+    return;
+  }
+
+  sendJSON(res, 200, {
+    email: info.email,
+    name: info.name,
+    picture: info.picture,
+    createdAt: info.createdAt,
+    lastUsed: info.lastUsed,
+  });
+}
+
+async function handleAuthRevoke(req, res) {
+  if (req.method !== 'POST') {
+    sendJSON(res, 405, { error: 'Method not allowed' });
+    return;
+  }
+
+  const authHeader = req.headers['authorization'];
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    sendJSON(res, 401, { error: 'Missing or invalid Authorization header' });
+    return;
+  }
+
+  const token = authHeader.slice(7);
+  if (!contributorTokens[token]) {
+    sendJSON(res, 401, { error: 'Invalid token' });
+    return;
+  }
+
+  delete contributorTokens[token];
+  saveTokens();
+  sendJSON(res, 200, { ok: true });
+}
+
+function handleAuthTokens(req, res) {
+  if (req.method !== 'GET') {
+    sendJSON(res, 405, { error: 'Method not allowed' });
+    return;
+  }
+
+  const secret = req.headers['x-node-secret'];
+  if (!secret || secret !== CONFIG.nodeSecret) {
+    sendJSON(res, 401, { error: 'Admin access required' });
+    return;
+  }
+
+  const tokens = Object.entries(contributorTokens).map(([token, info]) => ({
+    token: token.slice(0, 7) + '...',
+    email: info.email,
+    name: info.name,
+    createdAt: info.createdAt,
+    lastUsed: info.lastUsed,
+  }));
+
+  sendJSON(res, 200, { tokens, count: tokens.length });
 }
 
 // ── Response Helper ─────────────────────────────────────────────────────────
@@ -640,7 +1047,7 @@ const server = http.createServer((req, res) => {
   if (CONFIG.corsOrigin === '*' || origin === CONFIG.corsOrigin || origin === `http://localhost:${CONFIG.port}`) {
     res.setHeader('Access-Control-Allow-Origin', origin || '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Node-Secret, X-Node-Id');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Node-Secret, X-Node-Id, Authorization');
   }
 
   if (req.method === 'OPTIONS') {
@@ -649,14 +1056,27 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Rate limiting
-  if (!checkRateLimit(clientIP)) {
+  // Rate limiting (skip for authenticated node endpoints — they have their own auth)
+  const isNodeEndpoint = pathname.startsWith('/api/nodes/');
+  if (!isNodeEndpoint && !checkRateLimit(clientIP)) {
     sendJSON(res, 429, { error: 'Too many requests. Please slow down.' });
     return;
   }
 
+  // API routes — auth
+  if (pathname === '/api/auth/config') {
+    sendJSON(res, 200, { clientId: CONFIG.googleClientId || null });
+  } else if (pathname === '/api/auth/google') {
+    handleAuthGoogle(req, res);
+  } else if (pathname === '/api/auth/me') {
+    handleAuthMe(req, res);
+  } else if (pathname === '/api/auth/revoke') {
+    handleAuthRevoke(req, res);
+  } else if (pathname === '/api/auth/tokens') {
+    handleAuthTokens(req, res);
+  }
   // API routes
-  if (pathname === '/api/chat') {
+  else if (pathname === '/api/chat') {
     handleChat(req, res, clientIP);
   } else if (pathname === '/api/nodes/poll') {
     if (req.method !== 'GET') { sendJSON(res, 405, { error: 'Method not allowed' }); return; }
@@ -667,6 +1087,9 @@ const server = http.createServer((req, res) => {
     handleResult(req, res, jobId);
   } else if (pathname === '/api/nodes/register') {
     handleRegister(req, res);
+  } else if (pathname === '/api/setup') {
+    if (req.method !== 'GET') { sendJSON(res, 405, { error: 'Method not allowed' }); return; }
+    handleSetup(req, res);
   } else if (pathname === '/api/network') {
     if (req.method !== 'GET') { sendJSON(res, 405, { error: 'Method not allowed' }); return; }
     handleNetwork(req, res);

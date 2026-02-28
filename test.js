@@ -412,6 +412,135 @@ async function runTests() {
     assert.ok('totalQueries' in res.body);
   });
 
+  // ── Auth Endpoints ──
+
+  await test('POST /api/auth/google with missing credential returns 400', async () => {
+    const res = await request('POST', '/api/auth/google', {});
+    assert.strictEqual(res.status, 400);
+    assert.ok(res.body.error);
+  });
+
+  await test('POST /api/auth/google with invalid JWT returns 401', async () => {
+    const res = await request('POST', '/api/auth/google', { credential: 'not.a.valid.jwt' });
+    assert.strictEqual(res.status, 401);
+    assert.ok(res.body.error);
+  });
+
+  await test('GET /api/auth/me without Authorization returns 401', async () => {
+    const res = await request('GET', '/api/auth/me');
+    assert.strictEqual(res.status, 401);
+    assert.ok(res.body.error);
+  });
+
+  await test('GET /api/auth/me with bad token returns 401', async () => {
+    const res = await request('GET', '/api/auth/me', null, {
+      'Authorization': 'Bearer wm_bad_token_1234567890abcdef',
+    });
+    assert.strictEqual(res.status, 401);
+    assert.ok(res.body.error);
+  });
+
+  await test('GET /api/auth/tokens without admin secret returns 401', async () => {
+    const res = await request('GET', '/api/auth/tokens');
+    assert.strictEqual(res.status, 401);
+    assert.ok(res.body.error);
+  });
+
+  // ── Setup Endpoint ──
+
+  await test('GET /api/setup returns Mac steps for Mac UA', async () => {
+    const res = await request('GET', '/api/setup', null, {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+    });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.os, 'mac');
+    assert.strictEqual(res.body.supported, true);
+    assert.ok(Array.isArray(res.body.steps));
+    assert.ok(res.body.steps.length >= 2, 'Expected at least 2 steps');
+    assert.ok(res.body.quickCommand, 'Expected quickCommand for Mac');
+    assert.ok(res.body.quickCommand.includes('setup.sh'));
+  });
+
+  await test('GET /api/setup returns Android steps', async () => {
+    const res = await request('GET', '/api/setup', null, {
+      'User-Agent': 'Mozilla/5.0 (Linux; Android 13; SM-N960F) AppleWebKit/537.36',
+    });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.os, 'android');
+    assert.ok(res.body.model.includes('qwen3'));
+  });
+
+  await test('GET /api/setup returns unsupported for iOS', async () => {
+    const res = await request('GET', '/api/setup', null, {
+      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
+    });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.supported, false);
+    assert.strictEqual(res.body.os, 'ios');
+  });
+
+  // ── Device Chooser & Monitor Node ──
+
+  await test('GET /api/setup?device=iphone returns supported + monitor role', async () => {
+    const res = await request('GET', '/api/setup?device=iphone', null, {
+      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
+    });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.supported, true);
+    assert.strictEqual(res.body.os, 'ios');
+    assert.strictEqual(res.body.role, 'monitor');
+    assert.strictEqual(res.body.model, null);
+    assert.ok(res.body.message.includes('monitor'));
+    assert.ok(Array.isArray(res.body.steps));
+    assert.ok(res.body.steps.length >= 1);
+  });
+
+  await test('GET /api/setup?device=android overrides Mac UA detection', async () => {
+    const res = await request('GET', '/api/setup?device=android', null, {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+    });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.os, 'android');
+    assert.strictEqual(res.body.role, 'inference');
+    assert.strictEqual(res.body.supported, true);
+  });
+
+  let monitorNodeId = null;
+
+  await test('Monitor node poll returns 204 without stealing queued job', async () => {
+    // Register a monitor node
+    const regRes = await request('POST', '/api/nodes/register', {
+      name: 'iPhone Monitor',
+      role: 'monitor',
+      type: 'iphone',
+    }, AUTH);
+    assert.strictEqual(regRes.status, 201);
+    monitorNodeId = regRes.body.node.id;
+
+    // Fire a chat request to create a pending job
+    const chatPromise = request('POST', '/api/chat', { message: 'Monitor test' });
+    await new Promise(r => setTimeout(r, 100));
+
+    // Monitor node polls — should get 204 (no job), NOT 200
+    const pollRes = await request('GET', '/api/nodes/poll', null, {
+      ...AUTH, 'X-Node-Id': monitorNodeId,
+    });
+    assert.strictEqual(pollRes.status, 204);
+
+    // Inference node should still be able to pick up the job
+    const infPollRes = await request('GET', '/api/nodes/poll', null, {
+      ...AUTH, 'X-Node-Id': registeredNodeId,
+    });
+    assert.strictEqual(infPollRes.status, 200);
+    assert.ok(infPollRes.body.jobId);
+
+    // Clean up
+    await request('POST', `/api/nodes/result/${infPollRes.body.jobId}`, {
+      response: 'Monitor test done.',
+    }, { ...AUTH, 'X-Node-Id': registeredNodeId });
+    await chatPromise;
+  });
+
   // ── Summary ──
 
   process.stdout.write('\n' + '='.repeat(50) + '\n');
@@ -437,6 +566,7 @@ async function main() {
   process.env.JOB_CLEANUP_INTERVAL_MS = '999999';
   process.env.MAX_QUEUE_SIZE = '100';
   process.env.NODE_STALE_MS = '999999';
+  process.env.GOOGLE_CLIENT_ID = 'test-client-id.apps.googleusercontent.com';
 
   // Start server
   try {
