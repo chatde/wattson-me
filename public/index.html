@@ -858,6 +858,97 @@ main{position:relative;z-index:1;min-height:100vh;min-height:100dvh}
   .dash-content{padding:68px 12px 40px}
 }
 
+/* ── Contributor Dashboard ─────────────────────────────────────────────────── */
+.contrib-section{
+  margin-bottom:32px;
+  animation:fadeSlideUp 0.4s ease;
+}
+.contrib-section h2{
+  font-size:clamp(1.3rem,3vw,1.8rem);font-weight:600;
+  margin-bottom:16px;letter-spacing:-0.01em;
+}
+.contrib-card{
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:16px;padding:24px;
+  margin-bottom:12px;
+}
+.contrib-card-header{
+  display:flex;align-items:center;gap:12px;
+  margin-bottom:16px;
+}
+.contrib-card-header .contrib-name{
+  font-size:16px;font-weight:600;color:#F5F5F7;
+}
+.contrib-card-header .contrib-type{
+  font-size:12px;color:rgba(245,245,247,0.35);
+}
+.contrib-pulse-dot{
+  width:10px;height:10px;border-radius:50%;flex-shrink:0;
+}
+.contrib-pulse-dot.online{
+  background:#30D158;
+  box-shadow:0 0 6px rgba(48,209,88,0.5);
+  animation:contrib-pulse 2s ease infinite;
+}
+.contrib-pulse-dot.offline{
+  background:rgba(245,245,247,0.2);
+}
+@keyframes contrib-pulse{0%,100%{box-shadow:0 0 4px rgba(48,209,88,0.4)}50%{box-shadow:0 0 12px rgba(48,209,88,0.7)}}
+.contrib-stats{
+  display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;
+}
+.contrib-stat{
+  flex:1;min-width:100px;
+  text-align:center;
+  padding:12px 8px;
+  background:rgba(255,255,255,0.03);
+  border-radius:8px;
+}
+.contrib-stat-value{font-size:18px;font-weight:700;color:#F5F5F7}
+.contrib-stat-label{font-size:11px;color:rgba(245,245,247,0.35);margin-top:2px}
+.contrib-power-selector{
+  display:flex;gap:8px;margin-bottom:16px;
+}
+.contrib-power-btn{
+  flex:1;padding:10px 8px;
+  border-radius:10px;font-size:13px;font-weight:600;
+  border:1px solid rgba(255,255,255,0.08);
+  background:rgba(255,255,255,0.03);
+  color:rgba(245,245,247,0.5);
+  transition:all 0.2s ease;
+  text-align:center;
+}
+@media(hover:hover){.contrib-power-btn:hover{background:rgba(255,255,255,0.06);color:#F5F5F7}}
+.contrib-power-btn.active{
+  border-color:rgba(10,132,255,0.4);
+  background:rgba(10,132,255,0.12);
+  color:#409CFF;
+}
+.contrib-remove-btn{
+  display:block;width:100%;
+  padding:10px;border-radius:10px;
+  font-size:13px;font-weight:600;
+  border:1px solid rgba(255,59,48,0.2);
+  background:rgba(255,59,48,0.06);
+  color:rgba(255,59,48,0.7);
+  transition:all 0.2s ease;
+}
+@media(hover:hover){.contrib-remove-btn:hover{background:rgba(255,59,48,0.12);color:#FF453A}}
+.contrib-signin{
+  text-align:center;padding:32px 24px;
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:16px;
+  color:rgba(245,245,247,0.5);font-size:15px;
+}
+.contrib-signin a{color:#0A84FF;font-weight:500}
+.contrib-no-node{
+  text-align:center;padding:24px;
+  color:rgba(245,245,247,0.4);font-size:14px;
+}
+.contrib-no-node a{color:#0A84FF}
+
 /* ── Device Chooser (Step 0) ──────────────────────────────────────────────── */
 .device-chooser{
   max-width:640px;margin:0 auto 48px;
@@ -1573,6 +1664,7 @@ node wattson-client.js</pre>
       <h1>Network Dashboard</h1>
       <p>Real-time node stats &amp; health monitoring</p>
     </div>
+    <div class="contrib-section" id="contrib-dashboard" style="display:none"></div>
     <div class="dash-overview" id="dash-overview">
       <div class="dash-stat">
         <div class="stat-value" id="dash-total-nodes">-</div>
@@ -1644,7 +1736,13 @@ function showPage(pageName) {
     var target = document.getElementById('page-' + pageName);
     if (target) {
       target.classList.add('active');
-      requestAnimationFrame(function() { target.classList.add('visible'); });
+      requestAnimationFrame(function() {
+        target.classList.add('visible');
+        // Init page-specific content after display is applied
+        if (pageName === 'meet') initFace();
+        if (pageName === 'connect') loadNetwork();
+        if (pageName === 'dashboard') loadDashboard();
+      });
     }
   }, 150);
 
@@ -1659,10 +1757,6 @@ function showPage(pageName) {
   for (var m = 0; m < mItems.length; m++) {
     mItems[m].classList.toggle('active', mItems[m].getAttribute('data-page') === pageName);
   }
-
-  if (pageName === 'meet') initFace();
-  if (pageName === 'connect') loadNetwork();
-  if (pageName === 'dashboard') loadDashboard();
   window.scrollTo(0, 0);
 }
 
@@ -1893,21 +1987,30 @@ var faceState = {
   edgePulsePhase: 0, lastTime: 0,
 };
 
+function resizeFace() {
+  var container = document.getElementById('face-container');
+  if (!container || !faceCanvas || !faceCtx) return;
+  var rect = container.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return;
+  var dpr = window.devicePixelRatio || 1;
+  faceCanvas.width = rect.width * dpr;
+  faceCanvas.height = rect.height * dpr;
+  faceCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
 function initFace() {
-  if (faceInited) return;
+  if (faceInited) {
+    // Already initialized — just resize in case page was hidden
+    resizeFace();
+    return;
+  }
   faceCanvas = document.getElementById('wattson-face');
   if (!faceCanvas) return;
   faceCtx = faceCanvas.getContext('2d');
   faceInited = true;
 
   var container = document.getElementById('face-container');
-  function resizeFace() {
-    var rect = container.getBoundingClientRect();
-    var dpr = window.devicePixelRatio || 1;
-    faceCanvas.width = rect.width * dpr;
-    faceCanvas.height = rect.height * dpr;
-    faceCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
+
   resizeFace();
   window.addEventListener('resize', resizeFace);
 
@@ -2216,8 +2319,9 @@ var dashTimer = null;
 function loadDashboard() {
   if (dashTimer) clearInterval(dashTimer);
   fetchDashboard();
+  loadContribDashboard();
   dashTimer = setInterval(function() {
-    if (currentPage === 'dashboard') fetchDashboard();
+    if (currentPage === 'dashboard') { fetchDashboard(); loadContribDashboard(); }
     else { clearInterval(dashTimer); dashTimer = null; }
   }, 10000);
 }
@@ -2259,6 +2363,130 @@ function fetchDashboard() {
   });
 }
 
+// ── Contributor Dashboard ──────────────────────────────────────────────────
+
+function loadContribDashboard() {
+  var container = document.getElementById('contrib-dashboard');
+  if (!container) return;
+
+  var token = localStorage.getItem('wattson_token');
+  if (!token) {
+    container.style.display = 'block';
+    container.innerHTML =
+      '<div class="contrib-signin">' +
+        'Want to manage your nodes? <a href="/start" onclick="event.preventDefault();navigateTo(\'/start\')">Sign in</a> to see your contributor dashboard.' +
+      '</div>';
+    return;
+  }
+
+  fetch('/api/contributor/nodes', {
+    headers: { 'Authorization': 'Bearer ' + token },
+  })
+  .then(function(r) {
+    if (r.status === 401) {
+      container.style.display = 'block';
+      container.innerHTML =
+        '<div class="contrib-signin">' +
+          'Session expired. <a href="/start" onclick="event.preventDefault();navigateTo(\'/start\')">Sign in again</a> to manage your nodes.' +
+        '</div>';
+      return null;
+    }
+    return r.json();
+  })
+  .then(function(data) {
+    if (!data) return;
+    container.style.display = 'block';
+
+    if (!data.nodes || data.nodes.length === 0) {
+      container.innerHTML =
+        '<h2>My Nodes</h2>' +
+        '<div class="contrib-no-node">' +
+          'You don\'t have any nodes yet. <a href="/start" onclick="event.preventDefault();navigateTo(\'/start\')">Set up your device</a> to start contributing.' +
+        '</div>';
+      return;
+    }
+
+    var html = '<h2>My Nodes</h2>';
+    for (var i = 0; i < data.nodes.length; i++) {
+      var n = data.nodes[i];
+      var statusCls = n.status === 'online' ? 'online' : 'offline';
+      var statusText = n.status === 'online' ? 'Online' : 'Offline';
+      var avgMs = n.averageResponseMs ? n.averageResponseMs + 'ms' : '-';
+      var lastSeen = n.lastSeen ? timeAgo(n.lastSeen) : 'Never';
+      var pm = n.powerMode || 'FULL_FORCE';
+
+      html +=
+        '<div class="contrib-card" data-node-id="' + esc(n.id) + '">' +
+          '<div class="contrib-card-header">' +
+            '<span class="contrib-pulse-dot ' + statusCls + '"></span>' +
+            '<div>' +
+              '<div class="contrib-name">' + esc(n.name) + ' <span style="font-weight:400;color:rgba(245,245,247,0.4)">(' + statusText + ')</span></div>' +
+              '<div class="contrib-type">' + esc(n.type || 'unknown') + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="contrib-stats">' +
+            '<div class="contrib-stat"><div class="contrib-stat-value">' + (n.queriesServed || 0) + '</div><div class="contrib-stat-label">Queries</div></div>' +
+            '<div class="contrib-stat"><div class="contrib-stat-value">' + avgMs + '</div><div class="contrib-stat-label">Avg Response</div></div>' +
+            '<div class="contrib-stat"><div class="contrib-stat-value">' + esc(n.model || '-') + '</div><div class="contrib-stat-label">Model</div></div>' +
+            '<div class="contrib-stat"><div class="contrib-stat-value">' + lastSeen + '</div><div class="contrib-stat-label">Last Seen</div></div>' +
+          '</div>' +
+          '<div class="contrib-power-selector">' +
+            '<button class="contrib-power-btn' + (pm === 'FULL_FORCE' ? ' active' : '') + '" onclick="changeNodePower(\'' + esc(n.id) + '\',\'FULL_FORCE\',this)">Full Force</button>' +
+            '<button class="contrib-power-btn' + (pm === 'HALF_FORCE' ? ' active' : '') + '" onclick="changeNodePower(\'' + esc(n.id) + '\',\'HALF_FORCE\',this)">Half Force</button>' +
+            '<button class="contrib-power-btn' + (pm === 'ECO' ? ' active' : '') + '" onclick="changeNodePower(\'' + esc(n.id) + '\',\'ECO\',this)">Eco</button>' +
+          '</div>' +
+          '<button class="contrib-remove-btn" onclick="removeNode(\'' + esc(n.id) + '\')">Remove Node</button>' +
+        '</div>';
+    }
+    container.innerHTML = html;
+  })
+  .catch(function() {
+    container.style.display = 'block';
+    container.innerHTML =
+      '<div class="contrib-no-node">Could not load your nodes.</div>';
+  });
+}
+
+function changeNodePower(nodeId, mode, btn) {
+  var token = localStorage.getItem('wattson_token');
+  if (!token) return;
+
+  // Optimistic UI — highlight active button
+  var parent = btn.parentElement;
+  var btns = parent.querySelectorAll('.contrib-power-btn');
+  for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+  btn.classList.add('active');
+
+  fetch('/api/contributor/nodes/' + nodeId + '/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ powerMode: mode }),
+  })
+  .then(function(r) {
+    if (r.status !== 200) return r.json().then(function(d) { showError(d.error || 'Failed to update'); });
+  })
+  .catch(function() { showError('Network error'); });
+}
+
+function removeNode(nodeId) {
+  if (!confirm('Remove this node from the network? The client will stop on its next poll.')) return;
+  var token = localStorage.getItem('wattson_token');
+  if (!token) return;
+
+  fetch('/api/contributor/nodes/' + nodeId, {
+    method: 'DELETE',
+    headers: { 'Authorization': 'Bearer ' + token },
+  })
+  .then(function(r) {
+    if (r.status === 200) {
+      loadContribDashboard();
+    } else {
+      return r.json().then(function(d) { showError(d.error || 'Failed to remove'); });
+    }
+  })
+  .catch(function() { showError('Network error'); });
+}
+
 function timeAgo(iso) {
   var diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
   if (diff < 5) return 'just now';
@@ -2272,7 +2500,7 @@ function timeAgo(iso) {
 
 function esc(s) {
   if (typeof s !== 'string') return '';
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function showError(msg) {

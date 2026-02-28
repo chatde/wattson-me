@@ -31,6 +31,7 @@ if (!SECRET) { fatal('NODE_SECRET is required'); }
 
 let nodeId = null;
 let running = true;
+let consecutive401s = 0;
 
 // ── HTTP ────────────────────────────────────────────────────────────────────
 
@@ -53,7 +54,10 @@ function fetchJSON(method, url, body, headers = {}) {
     };
     const req = mod.request(opts, (res) => {
       let data = '';
-      res.on('data', (chunk) => data += chunk);
+      res.on('data', (chunk) => {
+        data += chunk;
+        if (data.length > 1048576) { res.destroy(); reject(new Error('Response too large')); return; }
+      });
       res.on('end', () => {
         try {
           resolve({ status: res.statusCode, body: data ? JSON.parse(data) : null });
@@ -102,12 +106,47 @@ async function pollLoop() {
       });
 
       if (res.status === 204) {
+        consecutive401s = 0;
+        await sleep(POLL_INTERVAL_MS);
+        continue;
+      }
+
+      if (res.status === 401) {
+        consecutive401s++;
+        if (consecutive401s >= 3) {
+          log('Node unregistered — attempting re-registration...');
+          consecutive401s = 0;
+          try {
+            await register();
+            log('Re-registered successfully');
+          } catch (err) {
+            log(`Re-registration failed: ${err.message} — retrying in 30s`);
+            await sleep(30000);
+          }
+          continue;
+        }
+        log(`Poll 401 (${consecutive401s}/3)`);
         await sleep(POLL_INTERVAL_MS);
         continue;
       }
 
       if (res.status !== 200) {
+        consecutive401s = 0;
         log(`Poll error: ${res.status}`);
+        await sleep(POLL_INTERVAL_MS);
+        continue;
+      }
+
+      consecutive401s = 0;
+
+      // Handle config updates
+      if (res.body.configUpdate) {
+        const cfg = res.body.configUpdate;
+        log(`Config update received: powerMode=${cfg.powerMode}`);
+      }
+
+      // No job — config-only response
+      if (!res.body.jobId) {
         await sleep(POLL_INTERVAL_MS);
         continue;
       }

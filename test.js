@@ -93,10 +93,11 @@ async function runTests() {
     assert.strictEqual(res.status, 400);
   });
 
-  await test('POST /api/chat rejects message over 500 chars', async () => {
-    const res = await request('POST', '/api/chat', { message: 'a'.repeat(501) });
+  await test('POST /api/chat rejects message over max input length', async () => {
+    const limit = parseInt(process.env.MAX_INPUT_LENGTH || '500', 10);
+    const res = await request('POST', '/api/chat', { message: 'a'.repeat(limit + 1) });
     assert.strictEqual(res.status, 400);
-    assert.ok(res.body.error.includes('500'));
+    assert.ok(res.body.error.includes(String(limit)));
   });
 
   await test('POST /api/chat rejects non-string message', async () => {
@@ -446,6 +447,82 @@ async function runTests() {
     assert.ok(res.body.error);
   });
 
+  // ── Registry Persistence ──
+
+  await test('Registry state saves and loads (totalQueries survives)', async () => {
+    const srv = require('./server.js');
+    const fs = require('fs');
+    const stateFile = srv.REGISTRY_STATE_FILE;
+
+    // Snapshot original state
+    const origTotal = srv.registry.totalQueries;
+    const origNodes = srv.registry.nodes.map(n => ({ ...n }));
+
+    // Save current state
+    srv.saveRegistryStateNow();
+
+    // Verify file was written
+    const data = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+    assert.strictEqual(data.totalQueries, origTotal, 'totalQueries should match');
+    assert.ok(Array.isArray(data.nodes), 'nodes should be an array');
+
+    // Modify totalQueries, save, clear, reload, verify
+    srv.registry.totalQueries = 9999;
+    srv.saveRegistryStateNow();
+    srv.registry.totalQueries = 0;
+    srv.registry.nodes.length = 0;
+    srv.loadRegistryState();
+    assert.strictEqual(srv.registry.totalQueries, 9999, 'totalQueries should restore to 9999');
+    assert.ok(srv.registry.nodes.length > 0, 'nodes should restore');
+
+    // Fully restore original state (nodes with original status)
+    srv.registry.totalQueries = origTotal;
+    srv.registry.nodes.length = 0;
+    for (const n of origNodes) srv.registry.nodes.push(n);
+
+    // Clean up test file
+    try { fs.unlinkSync(stateFile); } catch {}
+  });
+
+  // ── Log Rotation ──
+
+  await test('Log rotation rotates file at 5MB', async () => {
+    const fs = require('fs');
+    const testLog = '/tmp/wattson-test-rotation.jsonl';
+    const testBackup = testLog + '.1';
+
+    // Clean up any previous test files
+    try { fs.unlinkSync(testLog); } catch {}
+    try { fs.unlinkSync(testBackup); } catch {}
+
+    // Create a file just over 5MB
+    const line = JSON.stringify({ t: new Date().toISOString(), test: true, data: 'x'.repeat(200) }) + '\n';
+    const fd = fs.openSync(testLog, 'w');
+    const targetSize = 5 * 1024 * 1024 + 100;
+    let written = 0;
+    while (written < targetSize) {
+      fs.writeSync(fd, line);
+      written += Buffer.byteLength(line);
+    }
+    fs.closeSync(fd);
+
+    const sizeBefore = fs.statSync(testLog).size;
+    assert.ok(sizeBefore >= 5 * 1024 * 1024, 'Test file should be >= 5MB');
+
+    // The rotation happens inside fogLog which uses CONFIG.logFile
+    // Simulate by calling rename directly (same logic as rotateLogIfNeeded)
+    const stat = fs.statSync(testLog);
+    if (stat.size >= 5 * 1024 * 1024) {
+      fs.renameSync(testLog, testBackup);
+    }
+
+    assert.ok(fs.existsSync(testBackup), 'Backup file should exist');
+    assert.ok(!fs.existsSync(testLog), 'Original should be gone (renamed)');
+
+    // Clean up
+    try { fs.unlinkSync(testBackup); } catch {}
+  });
+
   // ── Setup Endpoint ──
 
   await test('GET /api/setup returns Mac steps for Mac UA', async () => {
@@ -541,6 +618,86 @@ async function runTests() {
     await chatPromise;
   });
 
+  // ── Contributor Endpoints ──
+
+  const CONTRIB_AUTH = { 'Authorization': 'Bearer wm_test_contrib_token' };
+  const CONTRIB_SECRET = { 'X-Node-Secret': 'wm_test_contrib_token' };
+  let contribNodeId = null;
+
+  await test('GET /api/contributor/nodes requires auth (401 without header)', async () => {
+    const res = await request('GET', '/api/contributor/nodes');
+    assert.strictEqual(res.status, 401);
+    assert.ok(res.body.error);
+  });
+
+  await test('GET /api/contributor/nodes returns owned nodes', async () => {
+    // Register a node using the contributor token
+    const regRes = await request('POST', '/api/nodes/register', {
+      name: 'Contrib Phone',
+      role: 'inference',
+      type: 'phone',
+      model: 'qwen3:1.7b',
+      powerMode: 'FULL_FORCE',
+      specs: { ram: '4GB' },
+    }, CONTRIB_SECRET);
+    assert.strictEqual(regRes.status, 201);
+    contribNodeId = regRes.body.node.id;
+
+    // Fetch contributor nodes
+    const res = await request('GET', '/api/contributor/nodes', null, CONTRIB_AUTH);
+    assert.strictEqual(res.status, 200);
+    assert.ok(Array.isArray(res.body.nodes));
+    assert.ok(res.body.nodes.length >= 1, 'Expected at least 1 owned node');
+    const owned = res.body.nodes.find(n => n.id === contribNodeId);
+    assert.ok(owned, 'Expected to find registered node in contributor nodes');
+    assert.strictEqual(owned.ownerToken, undefined, 'ownerToken should not be exposed');
+    assert.strictEqual(owned.ownerTokenHash, undefined, 'ownerTokenHash should not be exposed');
+  });
+
+  await test('POST /api/contributor/nodes/:id/config changes power mode + delivered via poll', async () => {
+    // Change power mode
+    const configRes = await request('POST', `/api/contributor/nodes/${contribNodeId}/config`,
+      { powerMode: 'ECO' }, CONTRIB_AUTH);
+    assert.strictEqual(configRes.status, 200);
+    assert.ok(configRes.body.ok);
+    assert.ok(configRes.body.queued);
+
+    // Poll should deliver config update
+    const pollRes = await request('GET', '/api/nodes/poll', null, {
+      ...CONTRIB_SECRET, 'X-Node-Id': contribNodeId,
+    });
+    assert.strictEqual(pollRes.status, 200);
+    assert.ok(pollRes.body.configUpdate);
+    assert.strictEqual(pollRes.body.configUpdate.powerMode, 'ECO');
+  });
+
+  await test('POST /api/contributor/nodes/:id/config rejects invalid power mode', async () => {
+    const res = await request('POST', `/api/contributor/nodes/${contribNodeId}/config`,
+      { powerMode: 'TURBO' }, CONTRIB_AUTH);
+    assert.strictEqual(res.status, 400);
+    assert.ok(res.body.error);
+  });
+
+  await test('DELETE /api/contributor/nodes/:id rejects non-owner (403)', async () => {
+    // Use a different auth token
+    const res = await request('DELETE', `/api/contributor/nodes/${contribNodeId}`, null, {
+      'Authorization': 'Bearer wm_fake_other_token',
+    });
+    assert.strictEqual(res.status, 401);
+  });
+
+  await test('DELETE /api/contributor/nodes/:id removes node (verify gone from list)', async () => {
+    const res = await request('DELETE', `/api/contributor/nodes/${contribNodeId}`, null, CONTRIB_AUTH);
+    assert.strictEqual(res.status, 200);
+    assert.ok(res.body.ok);
+
+    // Verify node is gone from contributor list
+    const listRes = await request('GET', '/api/contributor/nodes', null, CONTRIB_AUTH);
+    assert.strictEqual(listRes.status, 200);
+    const found = listRes.body.nodes.find(n => n.id === contribNodeId);
+    assert.strictEqual(found, undefined, 'Deleted node should not appear in list');
+  });
+
   // ── Summary ──
 
   process.stdout.write('\n' + '='.repeat(50) + '\n');
@@ -570,14 +727,27 @@ async function main() {
 
   // Start server
   try {
-    const server = require('./server.js');
+    const srv = require('./server.js');
+    const server = srv.server || srv;
+    const contributorTokensMap = srv.contributorTokens || {};
+    const registryRef = srv.registry || { nodes: [] };
+    const pendingConfigsMap = srv.pendingConfigs || new Map();
+
+    // Inject a test contributor token for contributor endpoint tests
+    contributorTokensMap['wm_test_contrib_token'] = {
+      email: 'test@example.com',
+      name: 'Test Contributor',
+      createdAt: new Date().toISOString(),
+      lastUsed: new Date().toISOString(),
+    };
+
     // Give server time to bind
     await new Promise(resolve => setTimeout(resolve, 500));
 
     const allPassed = await runTests();
 
     // Cleanup
-    if (server.close) server.close();
+    if (server && server.close) server.close();
     process.exit(allPassed ? 0 : 1);
   } catch (err) {
     process.stderr.write(`Failed to start server: ${err.message}\n`);

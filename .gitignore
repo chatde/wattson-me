@@ -1,5 +1,8 @@
 .env
 node_modules/
 conversations.jsonl
+conversations.jsonl.1
+registry-state.json
+tokens.json
 *.log
 .DS_Store

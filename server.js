@@ -42,7 +42,7 @@ const CONFIG = {
   corsOrigin: process.env.CORS_ORIGIN || 'https://wattson.me',
   logFile: process.env.LOG_FILE || path.join(__dirname, 'conversations.jsonl'),
   nodeSecret: process.env.NODE_SECRET || '',
-  jobTimeoutMs: parseInt(process.env.JOB_TIMEOUT_MS || '25000', 10),
+  jobTimeoutMs: parseInt(process.env.JOB_TIMEOUT_MS || '60000', 10),
   jobCleanupIntervalMs: parseInt(process.env.JOB_CLEANUP_INTERVAL_MS || '60000', 10),
   maxQueueSize: parseInt(process.env.MAX_QUEUE_SIZE || '100', 10),
   nodeStaleMs: parseInt(process.env.NODE_STALE_MS || '120000', 10),
@@ -51,6 +51,7 @@ const CONFIG = {
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const TOKENS_FILE = path.join(__dirname, 'tokens.json');
+const REGISTRY_STATE_FILE = path.join(__dirname, 'registry-state.json');
 
 // ── Token Storage ─────────────────────────────────────────────────────────────
 
@@ -66,7 +67,22 @@ function loadTokens() {
   }
 }
 
+let saveTokensTimer = null;
+
 function saveTokens() {
+  if (saveTokensTimer) return; // Already scheduled
+  saveTokensTimer = setTimeout(() => {
+    saveTokensTimer = null;
+    try {
+      fs.writeFileSync(TOKENS_FILE, JSON.stringify(contributorTokens, null, 2));
+    } catch {
+      // Non-critical
+    }
+  }, 5000); // Debounce: write at most every 5 seconds
+}
+
+function saveTokensNow() {
+  if (saveTokensTimer) { clearTimeout(saveTokensTimer); saveTokensTimer = null; }
   try {
     fs.writeFileSync(TOKENS_FILE, JSON.stringify(contributorTokens, null, 2));
   } catch {
@@ -79,6 +95,55 @@ function generateToken() {
 }
 
 loadTokens();
+
+// ── Registry Persistence ─────────────────────────────────────────────────────
+
+let saveRegistryTimer = null;
+
+function loadRegistryState() {
+  try {
+    if (fs.existsSync(REGISTRY_STATE_FILE)) {
+      const data = JSON.parse(fs.readFileSync(REGISTRY_STATE_FILE, 'utf8'));
+      if (typeof data.totalQueries === 'number') registry.totalQueries = data.totalQueries;
+      if (Array.isArray(data.nodes)) {
+        for (const saved of data.nodes) {
+          // Mark all restored nodes as offline until they poll again
+          saved.status = 'offline';
+          registry.nodes.push(saved);
+        }
+      }
+    }
+  } catch {
+    // Non-critical
+  }
+}
+
+function saveRegistryState() {
+  if (saveRegistryTimer) return;
+  saveRegistryTimer = setTimeout(() => {
+    saveRegistryTimer = null;
+    try {
+      fs.writeFileSync(REGISTRY_STATE_FILE, JSON.stringify({
+        totalQueries: registry.totalQueries,
+        nodes: registry.nodes,
+      }, null, 2));
+    } catch {
+      // Non-critical
+    }
+  }, 5000);
+}
+
+function saveRegistryStateNow() {
+  if (saveRegistryTimer) { clearTimeout(saveRegistryTimer); saveRegistryTimer = null; }
+  try {
+    fs.writeFileSync(REGISTRY_STATE_FILE, JSON.stringify({
+      totalQueries: registry.totalQueries,
+      nodes: registry.nodes,
+    }, null, 2));
+  } catch {
+    // Non-critical
+  }
+}
 
 // ── Google JWT Verification (zero dependencies) ──────────────────────────────
 
@@ -163,10 +228,12 @@ async function verifyGoogleJWT(token) {
 // ── Registry (in-memory) ──────────────────────────────────────────────────────
 
 const registry = { nodes: [], totalQueries: 0, networkVersion: '0.2.0' };
+loadRegistryState();
 
 // ── Job Queue ─────────────────────────────────────────────────────────────────
 
 const jobs = new Map(); // jobId -> { id, messages, status, createdAt, nodeId, res, timer, message, clientIP }
+const pendingConfigs = new Map(); // nodeId -> { powerMode }
 
 // ── Rate Limiter ──────────────────────────────────────────────────────────────
 
@@ -211,6 +278,10 @@ rateLimitCleanup.unref();
 
 function hashIP(ip) {
   return crypto.createHash('sha256').update(CONFIG.ipSalt + ip).digest('hex').slice(0, 12);
+}
+
+function hashToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
 }
 
 function stripHtml(str) {
@@ -259,9 +330,24 @@ function fogCategory(message) {
   return 'general';
 }
 
+const LOG_MAX_BYTES = 5 * 1024 * 1024; // 5MB
+
+function rotateLogIfNeeded() {
+  try {
+    const stat = fs.statSync(CONFIG.logFile);
+    if (stat.size >= LOG_MAX_BYTES) {
+      const backup = CONFIG.logFile + '.1';
+      fs.renameSync(CONFIG.logFile, backup);
+    }
+  } catch {
+    // File doesn't exist yet or can't stat — fine
+  }
+}
+
 function fogLog(hashedIP, message, responseMs, ok) {
   if (CONFIG.logFile === '/dev/null') return;
   try {
+    rotateLogIfNeeded();
     const entry = JSON.stringify({
       t: new Date().toISOString(),
       ip: hashedIP,
@@ -481,8 +567,9 @@ function authenticateNode(req, res) {
     return null;
   }
 
-  // Check master secret first, then contributor tokens
-  const isMaster = secret === CONFIG.nodeSecret;
+  // Check master secret first (timing-safe), then contributor tokens (hash lookup)
+  const isMaster = CONFIG.nodeSecret && secret.length === CONFIG.nodeSecret.length &&
+    crypto.timingSafeEqual(Buffer.from(secret), Buffer.from(CONFIG.nodeSecret));
   const isContributor = !isMaster && contributorTokens[secret];
 
   if (!isMaster && !isContributor) {
@@ -521,10 +608,22 @@ function handlePoll(req, res) {
   node.lastSeen = new Date().toISOString();
   node.status = 'online';
 
+  // Check for pending config update
+  const pendingConfig = pendingConfigs.get(node.id);
+  if (pendingConfig) {
+    pendingConfigs.delete(node.id);
+    // Apply config server-side
+    if (pendingConfig.powerMode) node.powerMode = pendingConfig.powerMode;
+  }
+
   // Monitor nodes heartbeat but never get jobs
   if (node.role === 'monitor') {
-    res.writeHead(204);
-    res.end();
+    if (pendingConfig) {
+      sendJSON(res, 200, { configUpdate: pendingConfig });
+    } else {
+      res.writeHead(204);
+      res.end();
+    }
     return;
   }
 
@@ -539,8 +638,12 @@ function handlePoll(req, res) {
   }
 
   if (!oldestJob) {
-    res.writeHead(204);
-    res.end();
+    if (pendingConfig) {
+      sendJSON(res, 200, { configUpdate: pendingConfig });
+    } else {
+      res.writeHead(204);
+      res.end();
+    }
     return;
   }
 
@@ -548,10 +651,13 @@ function handlePoll(req, res) {
   oldestJob.status = 'processing';
   oldestJob.nodeId = node.id;
 
-  sendJSON(res, 200, {
+  const pollResponse = {
     jobId: oldestJob.id,
     messages: oldestJob.messages,
-  });
+  };
+  if (pendingConfig) pollResponse.configUpdate = pendingConfig;
+
+  sendJSON(res, 200, pollResponse);
 }
 
 // ── Node Result (nodes post processed results back) ─────────────────────────
@@ -600,6 +706,7 @@ async function handleResult(req, res, jobId) {
     ? node.averageResponseMs * 0.7 + elapsed * 0.3
     : elapsed;
   registry.totalQueries++;
+  saveRegistryState();
 
   // Fog log
   fogLog(hashIP(job.clientIP), job.message, elapsed, true);
@@ -632,7 +739,9 @@ async function handleRegister(req, res) {
   }
 
   const secret = req.headers['x-node-secret'];
-  if (!secret || (secret !== CONFIG.nodeSecret && !contributorTokens[secret])) {
+  const isMasterReg = CONFIG.nodeSecret && secret && secret.length === CONFIG.nodeSecret.length &&
+    crypto.timingSafeEqual(Buffer.from(secret), Buffer.from(CONFIG.nodeSecret));
+  if (!secret || (!isMasterReg && !contributorTokens[secret])) {
     sendJSON(res, 401, { error: 'Invalid or missing secret' });
     return;
   }
@@ -683,9 +792,11 @@ async function handleRegister(req, res) {
     lastSeen: new Date().toISOString(),
     queriesServed: 0,
     averageResponseMs: 0,
+    ownerTokenHash: contributorTokens[secret] ? hashToken(secret) : null,
   };
 
   registry.nodes.push(newNode);
+  saveRegistryState();
 
   // Return safe node data
   sendJSON(res, 201, {
@@ -840,7 +951,11 @@ function handleSetup(req, res) {
   // Quick one-liner for bash-compatible platforms
   let quickCommand = null;
   if (supported && role === 'inference' && os !== 'windows') {
-    quickCommand = 'curl -fsSL https://wattson.me/setup.sh | bash';
+    if (os === 'android') {
+      quickCommand = 'curl -fsSL https://wattson.me/setup-termux.sh | bash -s -- YOUR_TOKEN';
+    } else {
+      quickCommand = 'curl -fsSL https://wattson.me/setup.sh | bash';
+    }
   }
 
   const result = { os, device, supported, model, steps, role };
@@ -978,8 +1093,125 @@ async function handleAuthRevoke(req, res) {
     return;
   }
 
+  // Remove orphaned nodes owned by this token
+  const tokenHash = hashToken(token);
+  for (let i = registry.nodes.length - 1; i >= 0; i--) {
+    if (registry.nodes[i].ownerTokenHash === tokenHash) {
+      pendingConfigs.delete(registry.nodes[i].id);
+      registry.nodes.splice(i, 1);
+    }
+  }
+
   delete contributorTokens[token];
   saveTokens();
+  saveRegistryState();
+  sendJSON(res, 200, { ok: true });
+}
+
+// ── Contributor Endpoints ────────────────────────────────────────────────────
+
+function authenticateContributor(req, res) {
+  const authHeader = req.headers['authorization'];
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    sendJSON(res, 401, { error: 'Missing or invalid Authorization header' });
+    return null;
+  }
+  const token = authHeader.slice(7);
+  if (!contributorTokens[token]) {
+    sendJSON(res, 401, { error: 'Invalid token' });
+    return null;
+  }
+  return token;
+}
+
+function handleContributorNodes(req, res) {
+  if (req.method !== 'GET') {
+    sendJSON(res, 405, { error: 'Method not allowed' });
+    return;
+  }
+
+  const token = authenticateContributor(req, res);
+  if (!token) return;
+
+  const owned = registry.nodes
+    .filter(n => n.ownerTokenHash === hashToken(token))
+    .map(n => ({
+      id: n.id,
+      name: n.name,
+      type: n.type,
+      role: n.role,
+      model: n.model,
+      status: n.status,
+      powerMode: n.powerMode,
+      specs: n.specs,
+      joinedAt: n.joinedAt,
+      lastSeen: n.lastSeen,
+      queriesServed: n.queriesServed || 0,
+      averageResponseMs: n.averageResponseMs ? Math.round(n.averageResponseMs) : null,
+    }));
+
+  sendJSON(res, 200, { nodes: owned });
+}
+
+async function handleContributorConfig(req, res, nodeId) {
+  if (req.method !== 'POST') {
+    sendJSON(res, 405, { error: 'Method not allowed' });
+    return;
+  }
+
+  const token = authenticateContributor(req, res);
+  if (!token) return;
+
+  const node = registry.nodes.find(n => n.id === nodeId);
+  if (!node) {
+    sendJSON(res, 404, { error: 'Node not found' });
+    return;
+  }
+  if (node.ownerTokenHash !== hashToken(token)) {
+    sendJSON(res, 403, { error: 'Not your node' });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readBody(req);
+  } catch (err) {
+    sendJSON(res, 400, { error: err.message });
+    return;
+  }
+
+  const validModes = ['FULL_FORCE', 'HALF_FORCE', 'ECO'];
+  if (!body.powerMode || !validModes.includes(body.powerMode)) {
+    sendJSON(res, 400, { error: 'powerMode must be FULL_FORCE, HALF_FORCE, or ECO' });
+    return;
+  }
+
+  pendingConfigs.set(nodeId, { powerMode: body.powerMode });
+  sendJSON(res, 200, { ok: true, queued: true });
+}
+
+function handleContributorRemoveNode(req, res, nodeId) {
+  if (req.method !== 'DELETE') {
+    sendJSON(res, 405, { error: 'Method not allowed' });
+    return;
+  }
+
+  const token = authenticateContributor(req, res);
+  if (!token) return;
+
+  const idx = registry.nodes.findIndex(n => n.id === nodeId);
+  if (idx === -1) {
+    sendJSON(res, 404, { error: 'Node not found' });
+    return;
+  }
+  if (registry.nodes[idx].ownerTokenHash !== hashToken(token)) {
+    sendJSON(res, 403, { error: 'Not your node' });
+    return;
+  }
+
+  registry.nodes.splice(idx, 1);
+  pendingConfigs.delete(nodeId);
+  saveRegistryState();
   sendJSON(res, 200, { ok: true });
 }
 
@@ -990,7 +1222,9 @@ function handleAuthTokens(req, res) {
   }
 
   const secret = req.headers['x-node-secret'];
-  if (!secret || secret !== CONFIG.nodeSecret) {
+  const isMasterAdmin = CONFIG.nodeSecret && secret && secret.length === CONFIG.nodeSecret.length &&
+    crypto.timingSafeEqual(Buffer.from(secret), Buffer.from(CONFIG.nodeSecret));
+  if (!isMasterAdmin) {
     sendJSON(res, 401, { error: 'Admin access required' });
     return;
   }
@@ -1039,15 +1273,19 @@ const server = http.createServer((req, res) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(self), geolocation=()');
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; frame-src https://accounts.google.com; img-src 'self' data:; connect-src 'self'");
+  if (CONFIG.corsOrigin !== '*' && CONFIG.corsOrigin.startsWith('https://')) {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
 
   // CORS
   const origin = req.headers.origin;
   if (CONFIG.corsOrigin === '*' || origin === CONFIG.corsOrigin || origin === `http://localhost:${CONFIG.port}`) {
     res.setHeader('Access-Control-Allow-Origin', origin || '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Node-Secret, X-Node-Id, Authorization');
+    res.setHeader('Vary', 'Origin');
   }
 
   if (req.method === 'OPTIONS') {
@@ -1067,26 +1305,38 @@ const server = http.createServer((req, res) => {
   if (pathname === '/api/auth/config') {
     sendJSON(res, 200, { clientId: CONFIG.googleClientId || null });
   } else if (pathname === '/api/auth/google') {
-    handleAuthGoogle(req, res);
+    handleAuthGoogle(req, res).catch(function() { sendJSON(res, 500, { error: 'Internal error' }); });
   } else if (pathname === '/api/auth/me') {
     handleAuthMe(req, res);
   } else if (pathname === '/api/auth/revoke') {
-    handleAuthRevoke(req, res);
+    handleAuthRevoke(req, res).catch(function() { sendJSON(res, 500, { error: 'Internal error' }); });
   } else if (pathname === '/api/auth/tokens') {
     handleAuthTokens(req, res);
   }
+  // API routes — contributor
+  else if (pathname === '/api/contributor/nodes') {
+    handleContributorNodes(req, res);
+  } else if (pathname.startsWith('/api/contributor/nodes/') && pathname.endsWith('/config')) {
+    const parts = pathname.split('/');
+    const contribNodeId = parts[4]; // /api/contributor/nodes/:id/config
+    handleContributorConfig(req, res, contribNodeId).catch(function() { sendJSON(res, 500, { error: 'Internal error' }); });
+  } else if (pathname.startsWith('/api/contributor/nodes/') && req.method === 'DELETE') {
+    const parts = pathname.split('/');
+    const contribNodeId = parts[4]; // /api/contributor/nodes/:id
+    handleContributorRemoveNode(req, res, contribNodeId);
+  }
   // API routes
   else if (pathname === '/api/chat') {
-    handleChat(req, res, clientIP);
+    handleChat(req, res, clientIP).catch(function() { sendJSON(res, 500, { error: 'Internal error' }); });
   } else if (pathname === '/api/nodes/poll') {
     if (req.method !== 'GET') { sendJSON(res, 405, { error: 'Method not allowed' }); return; }
     handlePoll(req, res);
   } else if (pathname.startsWith('/api/nodes/result/')) {
     if (req.method !== 'POST') { sendJSON(res, 405, { error: 'Method not allowed' }); return; }
     const jobId = pathname.slice('/api/nodes/result/'.length);
-    handleResult(req, res, jobId);
+    handleResult(req, res, jobId).catch(function() { sendJSON(res, 500, { error: 'Internal error' }); });
   } else if (pathname === '/api/nodes/register') {
-    handleRegister(req, res);
+    handleRegister(req, res).catch(function() { sendJSON(res, 500, { error: 'Internal error' }); });
   } else if (pathname === '/api/setup') {
     if (req.method !== 'GET') { sendJSON(res, 405, { error: 'Method not allowed' }); return; }
     handleSetup(req, res);
@@ -1122,10 +1372,16 @@ function startJobCleanup() {
       }
     }
     // Mark stale nodes offline
+    const nodeIds = new Set();
     for (const node of registry.nodes) {
+      nodeIds.add(node.id);
       if (node.lastSeen && (now - new Date(node.lastSeen).getTime() > CONFIG.nodeStaleMs)) {
         node.status = 'offline';
       }
+    }
+    // Clean up pendingConfigs for nodes that no longer exist
+    for (const [nodeId] of pendingConfigs) {
+      if (!nodeIds.has(nodeId)) pendingConfigs.delete(nodeId);
     }
   }, CONFIG.jobCleanupIntervalMs);
 }
@@ -1142,6 +1398,9 @@ server.listen(CONFIG.port, CONFIG.host, () => {
 function shutdown() {
   process.stdout.write('[wattson.me] Shutting down...\n');
   if (jobCleanupTimer) clearInterval(jobCleanupTimer);
+  clearInterval(rateLimitCleanup);
+  saveTokensNow();
+  saveRegistryStateNow();
 
   // Resolve any pending held responses
   for (const [id, job] of jobs) {
@@ -1163,4 +1422,4 @@ process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
 // Export for testing
-module.exports = server;
+module.exports = { server, registry, contributorTokens, pendingConfigs, saveRegistryStateNow, loadRegistryState, REGISTRY_STATE_FILE };
