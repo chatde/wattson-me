@@ -94,6 +94,10 @@ function generateToken() {
   return 'wm_' + crypto.randomBytes(16).toString('hex');
 }
 
+function isValidTokenFormat(token) {
+  return /^wm_[0-9a-f]{32}$/.test(token);
+}
+
 loadTokens();
 
 // ── Registry Persistence ─────────────────────────────────────────────────────
@@ -1240,6 +1244,426 @@ function handleAuthTokens(req, res) {
   sendJSON(res, 200, { tokens, count: tokens.length });
 }
 
+// ── Serve Client JS ─────────────────────────────────────────────────────
+
+function serveClientJS(req, res) {
+  const clientPath = path.join(__dirname, 'wattson-client.js');
+  fs.readFile(clientPath, (err, data) => {
+    if (err) {
+      res.writeHead(404);
+      res.end('wattson-client.js not found');
+      return;
+    }
+    res.writeHead(200, {
+      'Content-Type': 'application/javascript; charset=utf-8',
+      'Cache-Control': 'public, max-age=60',
+    });
+    res.end(data);
+  });
+}
+
+// ── Deploy Script Generators ─────────────────────────────────────────────
+
+function generateDeployScript(token, autostart) {
+  return `#!/usr/bin/env bash
+set -e
+
+# Wattson.me — One-Click Deploy Script
+# Token embedded. Safe to run anywhere.
+
+# Color output helpers
+green() { printf "\\033[0;32m✓\\033[0m %s\\n" "$1"; }
+blue() { printf "\\033[0;34mℹ\\033[0m %s\\n" "$1"; }
+red() { printf "\\033[0;31m✗\\033[0m %s\\n" "$1"; }
+
+blue "Detecting platform..."
+
+# Platform detection
+if [ -n "$PREFIX" ]; then
+  PLATFORM="termux"
+  blue "Platform: Termux (Android)"
+elif [ "$(uname -s)" = "Darwin" ]; then
+  PLATFORM="mac"
+  blue "Platform: macOS"
+elif [ "$(uname -s)" = "Linux" ]; then
+  PLATFORM="linux"
+  blue "Platform: Linux"
+else
+  red "Unsupported platform: $(uname -s)"
+  exit 1
+fi
+
+# RAM detection and model selection
+blue "Detecting RAM..."
+if [ "$PLATFORM" = "termux" ]; then
+  RAM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+  RAM_MB=$((RAM_KB / 1024))
+elif [ "$PLATFORM" = "mac" ]; then
+  RAM_BYTES=$(sysctl -n hw.memsize)
+  RAM_MB=$((RAM_BYTES / 1024 / 1024))
+elif [ "$PLATFORM" = "linux" ]; then
+  RAM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+  RAM_MB=$((RAM_KB / 1024))
+fi
+
+blue "Detected RAM: \${RAM_MB}MB"
+
+if [ "$RAM_MB" -lt 1536 ]; then
+  MODEL="qwen3:0.6b"
+elif [ "$RAM_MB" -lt 5120 ]; then
+  MODEL="qwen3:1.7b"
+else
+  MODEL="llama3.1:8b-q4"
+fi
+
+green "Selected model: $MODEL"
+
+# Check/install Node.js
+blue "Checking Node.js..."
+if ! command -v node >/dev/null 2>&1; then
+  blue "Installing Node.js..."
+  if [ "$PLATFORM" = "termux" ]; then
+    pkg update && pkg install -y nodejs-lts
+  elif [ "$PLATFORM" = "mac" ]; then
+    if command -v brew >/dev/null 2>&1; then
+      brew install node
+    else
+      red "Homebrew not found. Install Node.js manually from https://nodejs.org/"
+      exit 1
+    fi
+  elif [ "$PLATFORM" = "linux" ]; then
+    if command -v apt >/dev/null 2>&1; then
+      sudo apt update && sudo apt install -y nodejs npm
+    elif command -v dnf >/dev/null 2>&1; then
+      sudo dnf install -y nodejs npm
+    elif command -v yum >/dev/null 2>&1; then
+      sudo yum install -y nodejs npm
+    else
+      red "No package manager found. Install Node.js manually from https://nodejs.org/"
+      exit 1
+    fi
+  fi
+else
+  green "Node.js already installed: $(node --version)"
+fi
+
+# Check/install Ollama
+blue "Checking Ollama..."
+if ! command -v ollama >/dev/null 2>&1; then
+  blue "Installing Ollama..."
+  if [ "$PLATFORM" = "termux" ]; then
+    pkg update && pkg install -y ollama
+  elif [ "$PLATFORM" = "mac" ]; then
+    if command -v brew >/dev/null 2>&1; then
+      brew install ollama
+    else
+      curl -fsSL https://ollama.ai/install.sh | sh
+    fi
+  elif [ "$PLATFORM" = "linux" ]; then
+    curl -fsSL https://ollama.ai/install.sh | sh
+  fi
+else
+  green "Ollama already installed"
+fi
+
+# Ensure Ollama is running
+blue "Starting Ollama service..."
+if [ "$PLATFORM" = "termux" ]; then
+  if ! pgrep -x ollama >/dev/null; then
+    ollama serve >/dev/null 2>&1 &
+    sleep 3
+  fi
+elif [ "$PLATFORM" = "mac" ]; then
+  if ! pgrep -x ollama >/dev/null; then
+    brew services start ollama || ollama serve >/dev/null 2>&1 &
+    sleep 3
+  fi
+elif [ "$PLATFORM" = "linux" ]; then
+  if ! pgrep -x ollama >/dev/null; then
+    systemctl --user start ollama || ollama serve >/dev/null 2>&1 &
+    sleep 3
+  fi
+fi
+
+green "Ollama is running"
+
+# Pull model using Ollama API
+blue "Pulling model $MODEL (this may take a while)..."
+curl -s -X POST http://localhost:11434/api/pull -d "{\\"name\\":\\"$MODEL\\"}" | \\
+  grep -o '"status":"[^"]*"' | sed 's/"status":"\\([^"]*\\)"/\\1/' | \\
+  while read -r status; do
+    printf "\\r  %s" "$status"
+  done
+printf "\\n"
+green "Model $MODEL ready"
+
+# Create working directory
+mkdir -p ~/.wattson
+cd ~/.wattson
+
+# Download client
+blue "Downloading Wattson client..."
+curl -fsSL -o wattson-client.js https://wattson.me/wattson-client.js
+green "Client downloaded"
+
+# Setup autostart if requested
+${autostart ? `
+blue "Setting up autostart..."
+if [ "$PLATFORM" = "mac" ]; then
+  NODE_PATH=$(which node)
+  PLIST=~/Library/LaunchAgents/me.wattson.client.plist
+  mkdir -p ~/Library/LaunchAgents
+  cat > "$PLIST" <<PLISTEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>me.wattson.client</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$NODE_PATH</string>
+    <string>$HOME/.wattson/wattson-client.js</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>WATTSON_SERVER</key>
+    <string>https://wattson.me</string>
+    <key>NODE_SECRET</key>
+    <string>${token}</string>
+    <key>MODEL</key>
+    <string>$MODEL</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>$HOME/.wattson/wattson-client.log</string>
+  <key>StandardErrorPath</key>
+  <string>$HOME/.wattson/wattson-client.log</string>
+</dict>
+</plist>
+PLISTEOF
+  launchctl unload "$PLIST" 2>/dev/null || true
+  launchctl load "$PLIST"
+  green "Autostart configured (LaunchAgent)"
+elif [ "$PLATFORM" = "linux" ]; then
+  SYSTEMD_DIR=~/.config/systemd/user
+  mkdir -p "$SYSTEMD_DIR"
+  cat > "$SYSTEMD_DIR/wattson.service" <<SERVICEEOF
+[Unit]
+Description=Wattson Network Node
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$HOME/.wattson
+ExecStart=$(which node) $HOME/.wattson/wattson-client.js
+Environment="WATTSON_SERVER=https://wattson.me"
+Environment="NODE_SECRET=${token}"
+Environment="MODEL=$MODEL"
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
+SERVICEEOF
+  systemctl --user daemon-reload
+  systemctl --user enable wattson.service
+  systemctl --user restart wattson.service
+  green "Autostart configured (systemd)"
+elif [ "$PLATFORM" = "termux" ]; then
+  mkdir -p ~/.termux/boot
+  cat > ~/.termux/boot/wattson.sh <<BOOTEOF
+#!/data/data/com.termux/files/usr/bin/bash
+# Start Ollama
+if ! pgrep -x ollama >/dev/null; then
+  ollama serve >/dev/null 2>&1 &
+  sleep 5
+fi
+# Start Wattson client
+cd ~/.wattson
+WATTSON_SERVER=https://wattson.me \\\\
+NODE_SECRET=${token} \\\\
+MODEL=$MODEL \\\\
+node wattson-client.js >/dev/null 2>&1 &
+BOOTEOF
+  chmod +x ~/.termux/boot/wattson.sh
+  green "Autostart configured (Termux:Boot)"
+fi
+` : '# Autostart not requested'}
+
+# Start the client
+blue "Starting Wattson client..."
+green "Connected to Wattson.me network!"
+green "Your device is now contributing to the global AI network."
+${autostart ? 'green "Client will auto-start on reboot."' : ''}
+
+export WATTSON_SERVER=https://wattson.me
+export NODE_SECRET=${token}
+export MODEL=$MODEL
+exec node ~/.wattson/wattson-client.js
+`;
+}
+
+function generateDeployScriptPS1(token, autostart) {
+  return `# Wattson.me — One-Click Deploy Script (PowerShell)
+# Token embedded. Safe to run anywhere.
+
+Write-Host "✓ Detecting platform..." -ForegroundColor Blue
+
+# RAM detection and model selection
+$RAM_MB = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1MB)
+Write-Host "ℹ Detected RAM: \${RAM_MB}MB" -ForegroundColor Blue
+
+if ($RAM_MB -lt 1536) {
+  $MODEL = "qwen3:0.6b"
+} elseif ($RAM_MB -lt 5120) {
+  $MODEL = "qwen3:1.7b"
+} else {
+  $MODEL = "llama3.1:8b-q4"
+}
+
+Write-Host "✓ Selected model: $MODEL" -ForegroundColor Green
+
+# Check/install Node.js
+Write-Host "ℹ Checking Node.js..." -ForegroundColor Blue
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+  Write-Host "ℹ Installing Node.js via winget..." -ForegroundColor Blue
+  winget install -e --id OpenJS.NodeJS
+  if (-not $?) {
+    Write-Host "✗ winget failed. Download Node.js from https://nodejs.org/" -ForegroundColor Red
+    exit 1
+  }
+} else {
+  Write-Host "✓ Node.js already installed: $(node --version)" -ForegroundColor Green
+}
+
+# Check/install Ollama
+Write-Host "ℹ Checking Ollama..." -ForegroundColor Blue
+if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
+  Write-Host "ℹ Installing Ollama..." -ForegroundColor Blue
+  winget install -e --id Ollama.Ollama
+  if (-not $?) {
+    Write-Host "✗ winget failed. Download Ollama from https://ollama.ai/download" -ForegroundColor Red
+    exit 1
+  }
+} else {
+  Write-Host "✓ Ollama already installed" -ForegroundColor Green
+}
+
+# Start Ollama if not running
+Write-Host "ℹ Starting Ollama service..." -ForegroundColor Blue
+if (-not (Get-Process ollama -ErrorAction SilentlyContinue)) {
+  Start-Process ollama -ArgumentList "serve" -WindowStyle Hidden
+  Start-Sleep -Seconds 3
+}
+Write-Host "✓ Ollama is running" -ForegroundColor Green
+
+# Pull model
+Write-Host "ℹ Pulling model $MODEL (this may take a while)..." -ForegroundColor Blue
+$pullBody = @{ name = $MODEL } | ConvertTo-Json
+Invoke-RestMethod -Uri "http://localhost:11434/api/pull" -Method Post -Body $pullBody -ContentType "application/json" | Out-Null
+Write-Host "✓ Model $MODEL ready" -ForegroundColor Green
+
+# Create working directory
+$WattsonDir = "$env:USERPROFILE\\.wattson"
+New-Item -ItemType Directory -Force -Path $WattsonDir | Out-Null
+Set-Location $WattsonDir
+
+# Download client
+Write-Host "ℹ Downloading Wattson client..." -ForegroundColor Blue
+Invoke-WebRequest -Uri "https://wattson.me/wattson-client.js" -OutFile "wattson-client.js"
+Write-Host "✓ Client downloaded" -ForegroundColor Green
+
+${autostart ? `
+# Setup autostart
+Write-Host "ℹ Setting up autostart..." -ForegroundColor Blue
+$Action = New-ScheduledTaskAction -Execute "node" -Argument "$WattsonDir\\wattson-client.js" -WorkingDirectory $WattsonDir
+$Trigger = New-ScheduledTaskTrigger -AtLogOn
+$Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
+$EnvVars = @{
+  WATTSON_SERVER = "https://wattson.me"
+  NODE_SECRET = "${token}"
+  MODEL = $MODEL
+}
+$Principal = New-ScheduledTaskPrincipal -UserId ([System.Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive
+Unregister-ScheduledTask -TaskName "WattsonClient" -Confirm:$false -ErrorAction SilentlyContinue
+Register-ScheduledTask -TaskName "WattsonClient" -Action $Action -Trigger $Trigger -Settings $Settings -Principal $Principal
+Write-Host "✓ Autostart configured (Task Scheduler)" -ForegroundColor Green
+` : '# Autostart not requested'}
+
+# Start the client
+Write-Host "ℹ Starting Wattson client..." -ForegroundColor Blue
+Write-Host "✓ Connected to Wattson.me network!" -ForegroundColor Green
+Write-Host "✓ Your device is now contributing to the global AI network." -ForegroundColor Green
+${autostart ? 'Write-Host "✓ Client will auto-start on reboot." -ForegroundColor Green' : ''}
+
+$env:WATTSON_SERVER = "https://wattson.me"
+$env:NODE_SECRET = "${token}"
+$env:MODEL = $MODEL
+node wattson-client.js
+`;
+}
+
+// ── Deploy Handler ──────────────────────────────────────────────────────
+
+function handleDeploy(req, res) {
+  // Parse URL to extract token and format
+  const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  const pathname = urlObj.pathname;
+
+  // Extract token from /deploy/TOKEN or /deploy/TOKEN/ps1
+  const match = pathname.match(/^\/deploy\/([^/]+)(?:\/(ps1))?$/);
+  if (!match) {
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Invalid deploy URL. Use /deploy/YOUR_TOKEN or /deploy/YOUR_TOKEN/ps1');
+    return;
+  }
+
+  const token = match[1];
+  const isPowerShell = match[2] === 'ps1';
+
+  // Validate token format
+  if (!isValidTokenFormat(token)) {
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Invalid token format. Token must be in format: wm_[32 hex chars]\n\nGet your token from https://wattson.me/start');
+    return;
+  }
+
+  // Check token exists
+  if (!contributorTokens[token]) {
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Token not found. Please sign in at https://wattson.me/start to get a valid token.');
+    return;
+  }
+
+  // Parse autostart query param
+  const autostart = urlObj.searchParams.get('autostart') === '1';
+
+  // Update lastUsed
+  contributorTokens[token].lastUsed = new Date().toISOString();
+  saveTokens();
+
+  // Generate and serve the appropriate script
+  if (isPowerShell) {
+    const script = generateDeployScriptPS1(token, autostart);
+    res.writeHead(200, {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-store',
+    });
+    res.end(script);
+  } else {
+    const script = generateDeployScript(token, autostart);
+    res.writeHead(200, {
+      'Content-Type': 'text/x-shellscript; charset=utf-8',
+      'Cache-Control': 'no-store',
+    });
+    res.end(script);
+  }
+}
+
 // ── Response Helper ─────────────────────────────────────────────────────────
 
 function sendJSON(res, statusCode, data) {
@@ -1301,8 +1725,16 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Deploy routes
+  if (pathname.startsWith('/deploy/')) {
+    handleDeploy(req, res);
+  }
+  // Serve client JS directly
+  else if (pathname === '/wattson-client.js') {
+    serveClientJS(req, res);
+  }
   // API routes — auth
-  if (pathname === '/api/auth/config') {
+  else if (pathname === '/api/auth/config') {
     sendJSON(res, 200, { clientId: CONFIG.googleClientId || null });
   } else if (pathname === '/api/auth/google') {
     handleAuthGoogle(req, res).catch(function() { sendJSON(res, 500, { error: 'Internal error' }); });

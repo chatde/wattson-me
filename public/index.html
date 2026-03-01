@@ -1235,6 +1235,81 @@ main{position:relative;z-index:1;min-height:100vh;min-height:100dvh}
   *,*::before,*::after{animation-duration:0.01ms!important;transition-duration:0.01ms!important}
   #stars-canvas{display:none}
 }
+
+/* ── Deploy Hero ──────────────────────────────────────────────────────────── */
+.deploy-hero{
+  max-width:640px;margin:0 auto 48px;
+  animation:fadeSlideUp 0.4s ease;
+}
+.deploy-hero-cmd{
+  background:rgba(10,132,255,0.06);
+  border:2px solid rgba(10,132,255,0.25);
+  border-radius:16px;padding:28px 24px;
+  text-align:left;
+}
+.deploy-label{
+  font-size:13px;font-weight:600;letter-spacing:0.04em;
+  text-transform:uppercase;color:rgba(245,245,247,0.4);
+  margin-bottom:12px;display:flex;align-items:center;gap:8px;
+}
+.deploy-label .platform-icon{font-size:16px}
+.deploy-command{
+  position:relative;
+  background:rgba(0,0,0,0.4);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:10px;padding:18px 60px 18px 20px;
+  font-family:'SF Mono','Fira Code',monospace;
+  font-size:14px;line-height:1.6;
+  color:#30D158;
+  word-break:break-all;white-space:pre-wrap;
+  user-select:all;
+}
+.deploy-command .copy-btn{
+  position:absolute;top:12px;right:12px;
+  padding:6px 14px;font-size:12px;
+}
+.deploy-options{
+  display:flex;align-items:center;gap:16px;
+  margin-top:16px;flex-wrap:wrap;
+}
+.deploy-checkbox{
+  display:flex;align-items:center;gap:8px;
+  font-size:14px;color:rgba(245,245,247,0.6);
+  cursor:pointer;
+}
+.deploy-checkbox input[type="checkbox"]{
+  width:18px;height:18px;accent-color:#0A84FF;
+  cursor:pointer;
+}
+.deploy-desc{
+  margin-top:16px;
+  display:flex;flex-wrap:wrap;gap:8px;
+}
+.deploy-desc-item{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:13px;color:rgba(245,245,247,0.4);
+  padding:4px 12px;
+  background:rgba(255,255,255,0.03);
+  border-radius:50px;
+}
+.deploy-desc-item::before{
+  content:'';display:block;width:6px;height:6px;
+  border-radius:50%;background:#0A84FF;opacity:0.6;
+}
+.deploy-manual-toggle{
+  display:block;margin:20px auto 0;
+  font-size:13px;color:rgba(245,245,247,0.3);
+  text-decoration:underline;text-underline-offset:3px;
+  background:none;border:none;cursor:pointer;
+  transition:color 0.2s ease;
+}
+@media(hover:hover){.deploy-manual-toggle:hover{color:rgba(245,245,247,0.6)}}
+.deploy-manual-section{
+  margin-top:20px;
+  max-height:0;overflow:hidden;
+  transition:max-height 0.3s ease;
+}
+.deploy-manual-section.open{max-height:2000px}
 </style>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -1383,15 +1458,13 @@ main{position:relative;z-index:1;min-height:100vh;min-height:100dvh}
         </div>
       </div>
       <div class="wizard-progress" id="wizard-progress" style="display:none">
-        <div class="wizard-progress-step" id="wp-1"><span>1</span> Get Token</div>
+        <div class="wizard-progress-step" id="wp-1"><span>1</span> Sign In</div>
         <div class="wizard-progress-line" id="wpl-1"></div>
-        <div class="wizard-progress-step" id="wp-2"><span>2</span> Your Token</div>
-        <div class="wizard-progress-line" id="wpl-2"></div>
-        <div class="wizard-progress-step" id="wp-3"><span>3</span> Start</div>
+        <div class="wizard-progress-step" id="wp-2"><span>2</span> Deploy</div>
       </div>
       <div class="wiz-step" id="wiz-step-1">
-        <h3>Get Your Token</h3>
-        <p>Sign in to generate a unique contributor token for your device.</p>
+        <h3>Sign In</h3>
+        <p>Sign in with Google to get your unique deploy command.</p>
         <div class="google-signin-wrap">
           <div id="g_id_onload"
             data-client_id=""
@@ -1416,13 +1489,8 @@ main{position:relative;z-index:1;min-height:100vh;min-height:100dvh}
         </div>
       </div>
       <div class="wiz-step" id="wiz-step-2">
-        <div id="wiz-token-card"></div>
-        <button class="wiz-next-btn" onclick="advanceWizard(3)">Next &mdash; Get Setup Command</button>
-        <button class="wiz-link-btn" onclick="useAnotherAccount()">Use a different account</button>
-      </div>
-      <div class="wiz-step" id="wiz-step-3">
-        <div id="wiz-setup-content">
-          <div class="wiz-loading">Detecting your device...</div>
+        <div id="wiz-deploy-content">
+          <div class="wiz-loading">Generating your deploy command...</div>
         </div>
       </div>
     </div>
@@ -2536,10 +2604,96 @@ function selectDevice(device) {
   advanceWizard(1);
 }
 
-function loadWizardStep3() {
-  var content = document.getElementById('wiz-setup-content');
+function loadDeployStep() {
+  var content = document.getElementById('wiz-deploy-content');
   if (!content) return;
-  content.innerHTML = '<div class="wiz-loading">Detecting your device...</div>';
+  var token = contributorToken || '';
+  if (!token) {
+    content.innerHTML = '<div style="text-align:center;color:rgba(245,245,247,0.5);padding:24px">Please sign in first to get your deploy command.</div>';
+    return;
+  }
+
+  // Detect platform for display
+  var ua = navigator.userAgent || '';
+  var isWindows = /Windows/i.test(ua);
+  var isMac = /Macintosh/i.test(ua);
+  var isAndroid = /Android/i.test(ua);
+  var platformLabel = isWindows ? 'PowerShell' : isAndroid ? 'Termux' : isMac ? 'Terminal' : 'Terminal';
+  var platformIcon = isWindows ? '\uD83D\uDDA5' : isAndroid ? '\uD83D\uDCF1' : '\uD83D\uDCBB';
+
+  var bashCmd = 'curl -fsSL https://wattson.me/deploy/' + escapeHtml(token) + ' | bash';
+  var ps1Cmd = 'iwr https://wattson.me/deploy/' + escapeHtml(token) + '/ps1 | iex';
+  var displayCmd = isWindows ? ps1Cmd : bashCmd;
+
+  var welcomeName = contributorName ? ', ' + escapeHtml(contributorName) : '';
+
+  content.innerHTML =
+    '<div class="deploy-hero">' +
+      '<h3 style="margin-bottom:4px">Welcome' + welcomeName + '!</h3>' +
+      '<p style="font-size:15px;color:rgba(245,245,247,0.45);margin-bottom:24px">Your device is one command away from joining the network.</p>' +
+      '<div class="deploy-hero-cmd">' +
+        '<div class="deploy-label"><span class="platform-icon">' + platformIcon + '</span> Paste this into ' + platformLabel + '</div>' +
+        '<div class="deploy-command" id="deploy-cmd-block"><button class="copy-btn" onclick="copyDeployCmd(this)">Copy</button>' + displayCmd + '</div>' +
+        '<div class="deploy-options">' +
+          '<label class="deploy-checkbox"><input type="checkbox" id="deploy-autostart" onchange="updateDeployCmd()"> Auto-start on boot</label>' +
+        '</div>' +
+        '<div class="deploy-desc">' +
+          '<span class="deploy-desc-item">Installs Ollama</span>' +
+          '<span class="deploy-desc-item">Picks best model</span>' +
+          '<span class="deploy-desc-item">Downloads client</span>' +
+          '<span class="deploy-desc-item">Starts contributing</span>' +
+        '</div>' +
+      '</div>' +
+      '<button class="deploy-manual-toggle" onclick="toggleManualSetup()">Prefer manual setup?</button>' +
+      '<div class="deploy-manual-section" id="deploy-manual-section">' +
+        '<div id="wiz-manual-commands"></div>' +
+      '</div>' +
+      '<div style="margin-top:24px;text-align:center">' +
+        '<button class="wiz-link-btn" onclick="useAnotherAccount()">Use a different account</button>' +
+        '<button class="wiz-link-btn" style="margin-left:12px" onclick="revokeToken()">Revoke token</button>' +
+      '</div>' +
+    '</div>';
+
+  // Load manual setup commands
+  loadManualSetupCommands();
+}
+
+function updateDeployCmd() {
+  var token = contributorToken || '';
+  var autostart = document.getElementById('deploy-autostart');
+  var autostartParam = (autostart && autostart.checked) ? '?autostart=1' : '';
+  var ua = navigator.userAgent || '';
+  var isWindows = /Windows/i.test(ua);
+
+  var bashCmd = 'curl -fsSL https://wattson.me/deploy/' + escapeHtml(token) + autostartParam + ' | bash';
+  var ps1Cmd = 'iwr https://wattson.me/deploy/' + escapeHtml(token) + '/ps1' + autostartParam + ' | iex';
+  var displayCmd = isWindows ? ps1Cmd : bashCmd;
+
+  var block = document.getElementById('deploy-cmd-block');
+  if (block) {
+    block.innerHTML = '<button class="copy-btn" onclick="copyDeployCmd(this)">Copy</button>' + displayCmd;
+  }
+}
+
+function copyDeployCmd(btn) {
+  var code = btn.parentElement.textContent.replace('Copy', '').replace('Copied!', '').trim();
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(code).then(function() {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+    });
+  }
+}
+
+function toggleManualSetup() {
+  var section = document.getElementById('deploy-manual-section');
+  if (section) section.classList.toggle('open');
+}
+
+function loadManualSetupCommands() {
+  var container = document.getElementById('wiz-manual-commands');
+  if (!container) return;
 
   var setupUrl = '/api/setup';
   if (selectedDevice) setupUrl += '?device=' + encodeURIComponent(selectedDevice);
@@ -2547,90 +2701,37 @@ function loadWizardStep3() {
   fetch(setupUrl)
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      content.innerHTML = '';
-
-      // Monitor role (iPhone/iPad)
       if (data.role === 'monitor') {
-        var badge = document.createElement('div');
-        badge.className = 'monitor-badge';
-        badge.textContent = 'iPhone / iPad \u2014 Monitor Node';
-        content.appendChild(badge);
-
-        var explain = document.createElement('p');
-        explain.className = 'monitor-explain';
-        explain.textContent = data.message || 'Your device becomes a network monitor node.';
-        content.appendChild(explain);
-
-        // Sub-step 1: Add to Home Screen
-        var sub1 = document.createElement('div');
-        sub1.className = 'monitor-substep';
-        sub1.innerHTML = '<div class="monitor-substep-title"><span class="monitor-substep-num">1</span>Add to Home Screen</div>' +
-          '<p>In Safari: tap Share \u2192 "Add to Home Screen". This installs Wattson as a PWA for a native app experience.</p>';
-        content.appendChild(sub1);
-
-        // Sub-step 2: Start Monitoring button
-        var sub2 = document.createElement('div');
-        sub2.className = 'monitor-substep';
-        sub2.innerHTML = '<div class="monitor-substep-title"><span class="monitor-substep-num">2</span>Start Monitoring</div>' +
-          '<p>Once installed, tap the button below to activate your monitor node.</p>';
-        content.appendChild(sub2);
-
-        var btn = document.createElement('button');
-        btn.className = 'start-monitor-btn';
-        btn.textContent = 'Start Monitoring';
-        btn.onclick = startMonitoring;
-        content.appendChild(btn);
+        // Monitor devices don't need manual commands — they use the button
+        container.innerHTML = '<div style="padding:16px;text-align:center;color:rgba(245,245,247,0.4);font-size:14px">Monitor nodes use the one-click deploy command above.</div>';
         return;
       }
-
       if (!data.supported) {
-        content.innerHTML = '<div class="wizard-unsupported">' +
-          (data.message || 'This device is not supported yet. Check the detailed guides below.') + '</div>';
+        container.innerHTML = '<div class="wizard-unsupported">' +
+          (data.message || 'This device is not supported yet.') + '</div>';
         return;
       }
 
-      var osNames = { mac: 'Mac', windows: 'Windows', linux: 'Linux', android: 'Android', unknown: 'Your Device' };
-      var badge = document.createElement('div');
-      badge.className = 'wizard-detected';
-      badge.textContent = 'Detected: ' + (osNames[data.os] || data.os);
-      content.appendChild(badge);
-
-      // Power mode selector
-      var selector = document.createElement('div');
-      selector.className = 'power-selector';
-      selector.innerHTML =
-        '<div class="power-selector-label">Choose your power mode:</div>' +
-        '<div class="power-selector-options">' +
-          '<div class="power-option selected" data-mode="FULL_FORCE" onclick="selectPowerMode(this)">' +
-            '<div class="power-option-icon">&#9889;</div>' +
-            '<div class="power-option-name">Full Force</div>' +
-            '<div class="power-option-desc">100% dedicated</div>' +
-          '</div>' +
-          '<div class="power-option" data-mode="HALF_FORCE" onclick="selectPowerMode(this)">' +
-            '<div class="power-option-icon">&#9881;</div>' +
-            '<div class="power-option-name">Half Force</div>' +
-            '<div class="power-option-desc">Share resources</div>' +
-          '</div>' +
-          '<div class="power-option" data-mode="ECO" onclick="selectPowerMode(this)">' +
-            '<div class="power-option-icon">&#127807;</div>' +
-            '<div class="power-option-name">Eco</div>' +
-            '<div class="power-option-desc">Idle only</div>' +
-          '</div>' +
-        '</div>';
-      content.appendChild(selector);
-
-      // Commands container — re-rendered when power mode changes
-      var cmdsContainer = document.createElement('div');
-      cmdsContainer.id = 'wiz-commands-container';
-      content.appendChild(cmdsContainer);
-
-      // Store data for re-rendering on power mode change
       window._wizSetupData = data;
-      renderSetupCommands(data, cmdsContainer);
+      container.innerHTML = '';
+      var token = contributorToken || 'YOUR_TOKEN';
+
+      if (data.steps && data.steps.length > 0) {
+        for (var i = 0; i < data.steps.length; i++) {
+          var step = data.steps[i];
+          var stepCmd = step.command.replace(/YOUR_TOKEN/g, token);
+          var div = document.createElement('div');
+          div.className = 'wizard-step';
+          div.innerHTML = '<div class="wizard-step-title"><span class="wizard-step-num">' + (i + 1) + '</span>' +
+            step.title + '</div>' +
+            '<div class="wizard-command"><button class="copy-btn" onclick="copyCommand(this)">Copy</button>' +
+            escapeHtml(stepCmd) + '</div>';
+          container.appendChild(div);
+        }
+      }
     })
     .catch(function() {
-      content.innerHTML = '<div style="text-align:center;color:rgba(245,245,247,0.4);padding:24px">' +
-        'Could not detect your device. Check the detailed guides below.</div>';
+      container.innerHTML = '<div style="text-align:center;color:rgba(245,245,247,0.4);padding:24px">Could not load setup commands.</div>';
     });
 }
 
@@ -2743,7 +2844,7 @@ function startHeartbeat(token, nodeId) {
 }
 
 function showMonitorStatus(nodeId) {
-  var content = document.getElementById('wiz-setup-content');
+  var content = document.getElementById('wiz-deploy-content');
   if (!content) return;
   content.innerHTML =
     '<div class="monitor-status-card">' +
@@ -2760,8 +2861,8 @@ function stopMonitoring() {
   }
   localStorage.removeItem('wattson_node_id');
   localStorage.removeItem('wattson_monitor_active');
-  // Reload Step 3
-  loadWizardStep3();
+  // Reload deploy step
+  loadDeployStep();
 }
 
 function escapeHtml(str) {
@@ -2801,8 +2902,7 @@ function handleGoogleSignIn(response) {
     localStorage.setItem('wattson_token', r.data.token);
     localStorage.setItem('wattson_name', r.data.name);
     localStorage.setItem('wattson_email', r.data.email);
-    showTokenCard(r.data.token, r.data.name, r.data.email);
-    advanceWizard(2);
+    setTimeout(function() { advanceWizard(2); }, 500);
   })
   .catch(function() {
     showError('Could not complete sign-in. Try again.');
@@ -2860,8 +2960,6 @@ function revokeToken() {
     localStorage.removeItem('wattson_token');
     localStorage.removeItem('wattson_name');
     localStorage.removeItem('wattson_email');
-    var cardEl = document.getElementById('wiz-token-card');
-    if (cardEl) cardEl.innerHTML = '';
     advanceWizard(1);
   })
   .catch(function() { showError('Could not revoke token. Try again.'); });
@@ -2871,7 +2969,7 @@ var wizardStep = 1;
 
 function advanceWizard(step) {
   wizardStep = step;
-  for (var i = 1; i <= 3; i++) {
+  for (var i = 1; i <= 2; i++) {
     var stepEl = document.getElementById('wp-' + i);
     var lineEl = document.getElementById('wpl-' + (i - 1));
     if (stepEl) {
@@ -2881,11 +2979,11 @@ function advanceWizard(step) {
     }
     if (lineEl) lineEl.classList.toggle('active', i <= step);
   }
-  for (var j = 1; j <= 3; j++) {
+  for (var j = 1; j <= 2; j++) {
     var panel = document.getElementById('wiz-step-' + j);
     if (panel) panel.classList.toggle('active', j === step);
   }
-  if (step === 3) loadWizardStep3();
+  if (step === 2) loadDeployStep();
 }
 
 function toggleManualToken() {
@@ -2899,7 +2997,6 @@ function pasteToken() {
   if (!token) { showError('Please paste a valid token'); return; }
   contributorToken = token;
   localStorage.setItem('wattson_token', token);
-  showTokenCard(token, null, null);
   advanceWizard(2);
 }
 
@@ -2909,8 +3006,6 @@ function useAnotherAccount() {
   localStorage.removeItem('wattson_token');
   localStorage.removeItem('wattson_name');
   localStorage.removeItem('wattson_email');
-  var cardEl = document.getElementById('wiz-token-card');
-  if (cardEl) cardEl.innerHTML = '';
   advanceWizard(1);
 }
 
@@ -2928,11 +3023,14 @@ function checkExistingToken() {
   .then(function(data) {
     contributorToken = token;
     contributorName = data.name;
-    showTokenCard(token, data.name, data.email);
+    // Auto-show deploy step for returning users
+    var chooser = document.getElementById('device-chooser');
+    var progress = document.getElementById('wizard-progress');
+    if (chooser) chooser.style.display = 'none';
+    if (progress) progress.style.display = 'flex';
     advanceWizard(2);
   })
   .catch(function() {
-    // Token invalid, clear it
     localStorage.removeItem('wattson_token');
     localStorage.removeItem('wattson_name');
     localStorage.removeItem('wattson_email');
@@ -2951,16 +3049,16 @@ checkExistingToken();
   var monToken = localStorage.getItem('wattson_token');
   if (monActive && monNodeId && monToken) {
     selectedDevice = 'iphone';
-    // When navigating to /start, auto-advance to Step 3 and show status
+    // When navigating to /start, auto-advance to Step 2 and show status
     var origNav = window.navigateTo;
     function resumeMonitor() {
       var chooser = document.getElementById('device-chooser');
       var progress = document.getElementById('wizard-progress');
       if (chooser) chooser.style.display = 'none';
       if (progress) progress.style.display = 'flex';
-      wizardStep = 3;
-      advanceWizard(3);
-      // After loadWizardStep3 renders, replace with monitor status
+      wizardStep = 2;
+      advanceWizard(2);
+      // After loadDeployStep renders, replace with monitor status
       setTimeout(function() {
         startHeartbeat(monToken, monNodeId);
         showMonitorStatus(monNodeId);
