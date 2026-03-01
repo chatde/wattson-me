@@ -26,8 +26,8 @@ try {
       if (!process.env[key]) process.env[key] = val;
     }
   }
-} catch {
-  // Non-critical
+} catch (err) {
+  process.stderr.write(`[wattson.me] Failed to load .env: ${err.message}\n`);
 }
 
 // ── Config ─────────────────────────────────────────────────────────────────────
@@ -62,7 +62,8 @@ function loadTokens() {
     if (fs.existsSync(TOKENS_FILE)) {
       contributorTokens = JSON.parse(fs.readFileSync(TOKENS_FILE, 'utf8'));
     }
-  } catch {
+  } catch (err) {
+    process.stderr.write(`[wattson.me] Failed to load tokens: ${err.message}\n`);
     contributorTokens = {};
   }
 }
@@ -75,8 +76,8 @@ function saveTokens() {
     saveTokensTimer = null;
     try {
       fs.writeFileSync(TOKENS_FILE, JSON.stringify(contributorTokens, null, 2));
-    } catch {
-      // Non-critical
+    } catch (err) {
+      process.stderr.write(`[wattson.me] Failed to save tokens: ${err.message}\n`);
     }
   }, 5000); // Debounce: write at most every 5 seconds
 }
@@ -85,8 +86,8 @@ function saveTokensNow() {
   if (saveTokensTimer) { clearTimeout(saveTokensTimer); saveTokensTimer = null; }
   try {
     fs.writeFileSync(TOKENS_FILE, JSON.stringify(contributorTokens, null, 2));
-  } catch {
-    // Non-critical
+  } catch (err) {
+    process.stderr.write(`[wattson.me] Failed to save tokens (sync): ${err.message}\n`);
   }
 }
 
@@ -117,8 +118,8 @@ function loadRegistryState() {
         }
       }
     }
-  } catch {
-    // Non-critical
+  } catch (err) {
+    process.stderr.write(`[wattson.me] Failed to load registry state: ${err.message}\n`);
   }
 }
 
@@ -131,8 +132,8 @@ function saveRegistryState() {
         totalQueries: registry.totalQueries,
         nodes: registry.nodes,
       }, null, 2));
-    } catch {
-      // Non-critical
+    } catch (err) {
+      process.stderr.write(`[wattson.me] Failed to save registry state: ${err.message}\n`);
     }
   }, 5000);
 }
@@ -144,8 +145,8 @@ function saveRegistryStateNow() {
       totalQueries: registry.totalQueries,
       nodes: registry.nodes,
     }, null, 2));
-  } catch {
-    // Non-critical
+  } catch (err) {
+    process.stderr.write(`[wattson.me] Failed to save registry state (sync): ${err.message}\n`);
   }
 }
 
@@ -343,7 +344,7 @@ function rotateLogIfNeeded() {
       const backup = CONFIG.logFile + '.1';
       fs.renameSync(CONFIG.logFile, backup);
     }
-  } catch {
+  } catch (_) {
     // File doesn't exist yet or can't stat — fine
   }
 }
@@ -365,8 +366,8 @@ function fogLog(hashedIP, message, responseMs, ok) {
       ok,
     }) + '\n';
     fs.appendFileSync(CONFIG.logFile, entry);
-  } catch {
-    // Non-critical, don't crash
+  } catch (err) {
+    process.stderr.write(`[wattson.me] Fog log write failed: ${err.message}\n`);
   }
 }
 
@@ -403,7 +404,8 @@ function serveStatic(req, res, urlPath) {
   const cleanPath = urlPath.split('?')[0];
 
   if (cleanPath === '/' || cleanPath === '/about' || cleanPath === '/start' ||
-      cleanPath === '/meet' || cleanPath === '/connect' || cleanPath === '/dashboard') {
+      cleanPath === '/meet' || cleanPath === '/connect' || cleanPath === '/dashboard' ||
+      cleanPath === '/privacy' || cleanPath === '/terms') {
     filePath = path.join(PUBLIC_DIR, 'index.html');
   } else {
     filePath = path.join(PUBLIC_DIR, cleanPath);
@@ -449,7 +451,7 @@ function readBody(req) {
     req.on('end', () => {
       try {
         resolve(body ? JSON.parse(body) : {});
-      } catch {
+      } catch (_) {
         reject(new Error('Invalid JSON'));
       }
     });
@@ -1675,7 +1677,7 @@ function sendJSON(res, statusCode, data) {
       'Content-Length': Buffer.byteLength(body),
     });
     res.end(body);
-  } catch {
+  } catch (_) {
     // Response already sent or connection closed
   }
 }
@@ -1687,7 +1689,7 @@ const server = http.createServer((req, res) => {
   let pathname;
   try {
     pathname = new URL(req.url, `http://${req.headers.host || 'localhost'}`).pathname;
-  } catch {
+  } catch (_) {
     res.writeHead(400);
     res.end('Bad request');
     return;

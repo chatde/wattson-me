@@ -7,6 +7,18 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="description" content="Free AI powered by the devices you forgot about. Ask anything.">
+<meta property="og:title" content="Wattson — AI For the World">
+<meta property="og:description" content="Free AI powered by the devices you forgot about. Ask anything.">
+<meta property="og:url" content="https://wattson.me">
+<meta property="og:site_name" content="Wattson">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://wattson.me/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Wattson — AI For the World">
+<meta name="twitter:description" content="Free AI powered by the devices you forgot about. Ask anything.">
+<meta name="twitter:image" content="https://wattson.me/og-image.png">
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='11' cy='14' r='4' fill='%230A84FF'/><circle cx='21' cy='14' r='4' fill='%230A84FF'/></svg>">
 <title>Wattson — AI For the World</title>
@@ -1310,6 +1322,33 @@ main{position:relative;z-index:1;min-height:100vh;min-height:100dvh}
   transition:max-height 0.3s ease;
 }
 .deploy-manual-section.open{max-height:2000px}
+
+/* ── Legal Pages ─────────────────────────────────────────────────────────── */
+.legal-content{max-width:720px;margin:0 auto;padding:80px 24px 64px}
+.legal-content h1{
+  font-size:clamp(1.8rem,4vw,2.4rem);font-weight:700;
+  letter-spacing:-0.02em;margin-bottom:8px;
+}
+.legal-content .legal-date{
+  font-size:14px;color:rgba(245,245,247,0.35);margin-bottom:40px;
+}
+.legal-content h2{
+  font-size:18px;font-weight:600;color:#F5F5F7;
+  margin-top:32px;margin-bottom:12px;
+}
+.legal-content p,.legal-content li{
+  font-size:15px;line-height:1.7;color:rgba(245,245,247,0.6);
+  margin-bottom:8px;
+}
+.legal-content ul{margin-left:20px;list-style:disc}
+.legal-content a{color:#0A84FF}
+.legal-content a:hover{text-decoration:underline}
+.legal-footer{
+  text-align:center;padding-top:48px;margin-top:48px;
+  border-top:1px solid rgba(255,255,255,0.06);
+  font-size:14px;color:rgba(245,245,247,0.3);
+}
+.legal-footer a{color:#0A84FF;margin:0 8px}
 </style>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -1419,6 +1458,7 @@ main{position:relative;z-index:1;min-height:100vh;min-height:100dvh}
     <div class="about-footer">
       <p>Open source on <a href="https://github.com/chatde/wattson-me" target="_blank" rel="noopener">GitHub</a></p>
       <p style="margin-top:8px">A project by GHB Ventures</p>
+      <p style="margin-top:12px"><a href="/privacy" onclick="event.preventDefault();navigateTo('/privacy')">Privacy Policy</a> &middot; <a href="/terms" onclick="event.preventDefault();navigateTo('/terms')">Terms of Service</a></p>
     </div>
   </div>
 </section>
@@ -1777,6 +1817,123 @@ node wattson-client.js</pre>
   </div>
 </section>
 
+<!-- PRIVACY PAGE -->
+<section class="page" id="page-privacy">
+  <div class="legal-content">
+    <h1>Privacy Policy</h1>
+    <p class="legal-date">Last updated: March 1, 2026</p>
+
+    <h2>1. What Wattson.me Is</h2>
+    <p>Wattson.me is a distributed AI network where volunteers contribute their devices to run AI inference. When you ask Wattson a question, it is processed on a volunteer's device &mdash; not on a centralized cloud server.</p>
+
+    <h2>2. Information We Collect</h2>
+    <p>We collect minimal data to operate the service:</p>
+    <ul>
+      <li><strong>Chat messages:</strong> Your messages are sent to a volunteer node for processing. We do NOT store the content of your messages. We log only a one-way hash, word count, and category (e.g. "science", "code") for analytics.</li>
+      <li><strong>IP address:</strong> Your IP address is hashed with a salt before logging. We never store your raw IP address.</li>
+      <li><strong>Contributor accounts:</strong> If you sign in with Google to contribute a device, we store your name, email, and profile picture to manage your account and nodes.</li>
+      <li><strong>Cookies:</strong> We use only essential cookies for authentication. No tracking cookies.</li>
+    </ul>
+
+    <h2>3. How We Use Your Information</h2>
+    <ul>
+      <li>To route your questions to available inference nodes</li>
+      <li>To generate aggregate usage statistics (total queries, response times)</li>
+      <li>To manage contributor accounts and device registrations</li>
+      <li>To prevent abuse through rate limiting</li>
+    </ul>
+
+    <h2>4. Data Sharing</h2>
+    <p>We do not sell or share your personal data. Your chat messages are processed by volunteer nodes but are not stored by those nodes. Google Sign-In data is used solely for authentication.</p>
+
+    <h2>5. Data Retention</h2>
+    <p>Fog logs (hashed, anonymized analytics) are retained for up to 5MB of rolling data. Contributor account data is retained until you revoke your token. Chat messages are not retained after processing.</p>
+
+    <h2>6. Volunteer Node Privacy</h2>
+    <p>If you contribute a device, your node's name, type, model, and status are visible on the public network dashboard. Your IP address and authentication token are never exposed publicly.</p>
+
+    <h2>7. Security</h2>
+    <p>All communication uses HTTPS. Authentication tokens are validated server-side. IP addresses are hashed before storage. We use timing-safe comparisons for secret validation.</p>
+
+    <h2>8. Your Rights</h2>
+    <ul>
+      <li>You can revoke your contributor token at any time, which deletes your account and all associated nodes</li>
+      <li>You can use Wattson without creating an account</li>
+      <li>Contact us to request data deletion</li>
+    </ul>
+
+    <h2>9. Changes</h2>
+    <p>We may update this policy. Changes will be reflected on this page with an updated date.</p>
+
+    <h2>10. Contact</h2>
+    <p>Questions? Open an issue on <a href="https://github.com/chatde/wattson-me" target="_blank" rel="noopener">GitHub</a> or email <a href="mailto:contact@wattson.me">contact@wattson.me</a>.</p>
+
+    <div class="legal-footer">
+      <a href="/terms" onclick="event.preventDefault();navigateTo('/terms')">Terms of Service</a>
+      <a href="/" onclick="event.preventDefault();navigateTo('/')">Back to Home</a>
+    </div>
+  </div>
+</section>
+
+<!-- TERMS PAGE -->
+<section class="page" id="page-terms">
+  <div class="legal-content">
+    <h1>Terms of Service</h1>
+    <p class="legal-date">Last updated: March 1, 2026</p>
+
+    <h2>1. Acceptance</h2>
+    <p>By using Wattson.me, you agree to these terms. If you do not agree, please do not use the service.</p>
+
+    <h2>2. The Service</h2>
+    <p>Wattson.me provides free AI chat powered by a distributed network of volunteer devices. The service is provided "as is" with no guarantees of availability, accuracy, or response time.</p>
+
+    <h2>3. User Conduct</h2>
+    <p>You agree not to:</p>
+    <ul>
+      <li>Use the service for illegal purposes</li>
+      <li>Attempt to attack, exploit, or disrupt the network or volunteer nodes</li>
+      <li>Send abusive, harmful, or excessively large inputs</li>
+      <li>Circumvent rate limits or abuse the API</li>
+      <li>Impersonate others or misrepresent your identity</li>
+    </ul>
+
+    <h2>4. AI Responses</h2>
+    <p>Wattson's responses are generated by AI models running on volunteer hardware. Responses may be inaccurate, incomplete, or inappropriate. Do not rely on Wattson for medical, legal, financial, or safety-critical advice.</p>
+
+    <h2>5. Contributing a Device</h2>
+    <p>If you contribute a device to the network:</p>
+    <ul>
+      <li>You are responsible for your own hardware, power, and internet costs</li>
+      <li>You grant Wattson.me permission to route inference requests to your device</li>
+      <li>You can disconnect your device at any time</li>
+      <li>You must not modify the client to store, log, or exfiltrate user messages</li>
+    </ul>
+
+    <h2>6. Tokens &amp; Authentication</h2>
+    <p>Contributor tokens are personal and non-transferable. You are responsible for keeping your token secure. Compromised tokens should be revoked immediately.</p>
+
+    <h2>7. Intellectual Property</h2>
+    <p>Wattson.me is open source under the terms of its <a href="https://github.com/chatde/wattson-me" target="_blank" rel="noopener">GitHub repository</a>. The Wattson name and branding are property of GHB Ventures.</p>
+
+    <h2>8. Limitation of Liability</h2>
+    <p>Wattson.me, its contributors, and GHB Ventures are not liable for any damages arising from the use of this service, including but not limited to inaccurate AI responses, service outages, or data loss.</p>
+
+    <h2>9. Termination</h2>
+    <p>We may suspend or terminate access to the service at any time, for any reason, without notice. You may stop using the service at any time.</p>
+
+    <h2>10. Changes</h2>
+    <p>We may update these terms. Continued use after changes constitutes acceptance.</p>
+
+    <h2>11. Contact</h2>
+    <p>Questions? Open an issue on <a href="https://github.com/chatde/wattson-me" target="_blank" rel="noopener">GitHub</a> or email <a href="mailto:contact@wattson.me">contact@wattson.me</a>.</p>
+
+    <div class="legal-footer">
+      <a href="/privacy" onclick="event.preventDefault();navigateTo('/privacy')">Privacy Policy</a>
+      <a href="/" onclick="event.preventDefault();navigateTo('/')">Back to Home</a>
+    </div>
+  </div>
+</section>
+
 </main>
 
 <script>
@@ -1788,7 +1945,7 @@ node wattson-client.js</pre>
 // ── SPA Router ───────────────────────────────────────────────────────────────
 
 var currentPage = 'home';
-var pageMap = { '/': 'home', '/about': 'about', '/start': 'start', '/meet': 'meet', '/connect': 'connect', '/dashboard': 'dashboard' };
+var pageMap = { '/': 'home', '/about': 'about', '/start': 'start', '/meet': 'meet', '/connect': 'connect', '/dashboard': 'dashboard', '/privacy': 'privacy', '/terms': 'terms' };
 
 function navigateTo(path) {
   var pageName = pageMap[path] || 'home';
