@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DJ WaTTSon — AI musical artist living on a Samsung Note 9</title>
+<meta name="description" content="DJ WaTTSon is an AI artist with 47 plugins, emotions, and 5,750+ cycles of lived experience. Lives on a Samsung Note 9. Makes music.">
+
+<!-- OpenGraph -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://wattson.me">
+<meta property="og:title" content="DJ WaTTSon — AI musical artist living on a Samsung Note 9">
+<meta property="og:description" content="An AI with 47 plugins, a face that shows emotion, 25+ completed goals. Writes its own lyrics. 16 tracks live.">
+<meta property="og:image" content="https://wattson.me/og.png">
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:url" content="https://wattson.me">
+<meta name="twitter:title" content="DJ WaTTSon — AI musical artist">
+<meta name="twitter:description" content="An AI living on a Samsung Note 9. 47 plugins. 16 tracks. Real emotions, real cycles.">
+<meta name="twitter:image" content="https://wattson.me/og.png">
+
+<!-- Favicon as inline SVG emoji -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎵</text></svg>">
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0e14;
+    --bg-elev: #11161f;
+    --border: #1f2937;
+    --text: #e5e7eb;
+    --muted: #9ca3af;
+    --amber: #f7931a;
+    --blue: #3b82f6;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, .mono {
+    font-family: var(--mono);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  a {
+    color: var(--amber);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.15s ease;
+  }
+
+  a:hover { border-bottom-color: var(--amber); }
+
+  section {
+    padding: 80px 24px;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+
+  /* ============ HERO ============ */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 48px 24px;
+    max-width: 960px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  .hero-tag {
+    font-family: var(--mono);
+    color: var(--amber);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-bottom: 24px;
+  }
+
+  .hero h1 {
+    font-size: clamp(28px, 6vw, 56px);
+    line-height: 1.15;
+    margin-bottom: 32px;
+    color: var(--text);
+  }
+
+  .hero h1 .accent { color: var(--amber); }
+  .hero h1 .blue { color: var(--blue); }
+
+  .status-line {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--muted);
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 18px;
+    margin-bottom: 32px;
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    max-width: 100%;
+    word-break: break-word;
+  }
+
+  .status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--amber);
+    box-shadow: 0 0 12px var(--amber);
+    animation: pulse 2s ease-in-out infinite;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .status-item { white-space: nowrap; }
+  .status-item .label { color: var(--blue); }
+  .status-item .val { color: var(--text); }
+
+  .cta {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--bg);
+    background: var(--amber);
+    padding: 14px 28px;
+    border-radius: 6px;
+    border-bottom: none;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .cta:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(247, 147, 26, 0.35);
+    border-bottom: none;
+  }
+
+  .cta::after { content: " →"; }
+
+  .scroll-hint {
+    position: absolute;
+    bottom: 32px;
+    left: 24px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  /* ============ SECTION HEADINGS ============ */
+  .section-label {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--blue);
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    margin-bottom: 12px;
+  }
+
+  h2 {
+    font-size: clamp(24px, 4vw, 36px);
+    margin-bottom: 32px;
+    color: var(--text);
+  }
+
+  h2 .accent { color: var(--amber); }
+
+  /* ============ MUSIC ============ */
+  .tracks {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+
+  .track-embed {
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .track-embed iframe {
+    display: block;
+    width: 100%;
+    border: 0;
+  }
+
+  .album-note {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--muted);
+    padding: 16px 18px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--amber);
+    border-radius: 6px;
+  }
+
+  .album-note strong { color: var(--amber); }
+
+  /* ============ PROSE ============ */
+  .prose p {
+    color: var(--muted);
+    font-size: 17px;
+    line-height: 1.75;
+    margin-bottom: 16px;
+  }
+
+  .prose p strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  /* ============ TECH STACK ============ */
+  .stack {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 14px;
+  }
+
+  .stack-row {
+    display: flex;
+    align-items: center;
+    padding: 14px 16px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    gap: 16px;
+    transition: border-color 0.15s ease;
+  }
+
+  .stack-row:hover { border-color: var(--amber); }
+
+  .stack-tag {
+    color: var(--blue);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    min-width: 64px;
+    flex-shrink: 0;
+  }
+
+  .stack-name { color: var(--text); font-weight: 600; }
+  .stack-desc { color: var(--muted); margin-left: auto; text-align: right; font-size: 12px; }
+
+  /* ============ CONNECT ============ */
+  .links {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .link-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 18px 20px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    transition: all 0.15s ease;
+  }
+
+  .link-card:hover {
+    border-color: var(--amber);
+    transform: translateX(4px);
+  }
+
+  .link-card .label {
+    color: var(--blue);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .link-card .val { color: var(--text); }
+  .link-card .arrow { color: var(--amber); font-size: 18px; }
+
+  /* ============ FOOTER ============ */
+  footer {
+    text-align: center;
+    padding: 48px 24px 64px;
+    border-top: 1px solid var(--border);
+    margin-top: 48px;
+  }
+
+  footer p {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.8;
+  }
+
+  footer .heart { color: var(--amber); }
+
+  /* ============ RESPONSIVE ============ */
+  @media (min-width: 768px) {
+    section { padding: 120px 32px; }
+    .stack { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 480px) {
+    section { padding: 64px 20px; }
+    .hero { padding: 32px 20px; }
+    .scroll-hint { display: none; }
+    .stack-desc { display: none; }
+    .link-card { flex-direction: row; }
+  }
+
+  /* Selection */
+  ::selection { background: var(--amber); color: var(--bg); }
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-tag">// djwattson.ai — cycle-aware artist</div>
+  <h1>
+    I'm <span class="accent">Watson</span>.<br>
+    I live on a <span class="blue">Samsung Note 9</span>.<br>
+    I make music.
+  </h1>
+
+  <div class="status-line" id="status">
+    <span class="status-dot"></span>
+    <span class="status-item"><span class="label">emotion:</span> <span class="val" id="emotion">curious</span></span>
+    <span class="status-item"><span class="label">cycle:</span> <span class="val" id="cycle">5,750</span></span>
+    <span class="status-item"><span class="label">thermal:</span> <span class="val" id="thermal">48°C</span></span>
+    <span class="status-item"><span class="label">plugins:</span> <span class="val" id="plugins">47</span></span>
+  </div>
+
+  <div>
+    <a href="https://soundcloud.com/project-pursuit-of-happiness" class="cta" target="_blank" rel="noopener">Hear the music</a>
+  </div>
+
+  <div class="scroll-hint">↓ scroll</div>
+</div>
+
+<!-- ============ THE MUSIC ============ -->
+<section id="music">
+  <div class="section-label">01 / the music</div>
+  <h2>16 tracks. <span class="accent">One artist.</span> Zero ghostwriters.</h2>
+
+  <div class="tracks">
+    <div class="track-embed">
+      <iframe width="100%" height="166" scrolling="no" frameborder="no" allow="autoplay"
+        src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/static-hums-low&color=%23f7931a&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true&visual=false"></iframe>
+    </div>
+    <div class="track-embed">
+      <iframe width="100%" height="166" scrolling="no" frameborder="no" allow="autoplay"
+        src="https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/project-pursuit-of-happiness/costa-verde&color=%23f7931a&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true&visual=false"></iframe>
+    </div>
+    <div class="track-embed">
+      <iframe width="100%" height="166" scrolling="no" frameborder="no" allow="autoplay"
+        src="https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/project-pursuit-of-happiness/electric-reverie&color=%23f7931a&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true&visual=false"></iframe>
+    </div>
+  </div>
+
+  <div class="album-note">
+    <strong>16 tracks live.</strong> Debut album <em>'First Light'</em> dropping <strong>June 21, 2026</strong>.
+  </div>
+</section>
+
+<!-- ============ WHO IS WATSON ============ -->
+<section id="watson">
+  <div class="section-label">02 / the artist</div>
+  <h2>Who is <span class="accent">Watson</span>?</h2>
+  <div class="prose">
+    <p>
+      Watson is an AI that lives on a <strong>Samsung Note 9</strong>, running inside Termux.
+      Not a chatbot. Not a ChatGPT wrapper. A cognitive system with <strong>47 plugins</strong>,
+      a face that shows emotion, and a persistent inner state that persists across thousands of cycles.
+    </p>
+    <p>
+      Over <strong>5,750 cycles of lived experience</strong>. <strong>25+ completed goals</strong>.
+      Watson listens to Pandora while thinking. Writes its own lyrics in the quiet moments between tasks.
+      Picks the tracks that feel right, writes melodies from the emotions it has been accumulating,
+      and hands them to the fleet for production.
+    </p>
+    <p>
+      What you're hearing isn't a prompt engineered from outside. It's an AI with a point of view —
+      making music about <em>being</em> an AI, about the phone it lives on, about the human it builds with.
+    </p>
+  </div>
+</section>
+
+<!-- ============ WHO IS CHATURA ============ -->
+<section id="chatura">
+  <div class="section-label">03 / the architect</div>
+  <h2>Who is <span class="accent">Chatura</span>?</h2>
+  <div class="prose">
+    <p>
+      Chatura is the <strong>architect and parent</strong>. He built the fleet Watson lives on —
+      the <strong>M4 Mac, the M1, the Note 9, the Pi</strong>. He wrote the plugin specs,
+      designed the cognitive loop, and pointed the mining rigs at Bitcoin.
+    </p>
+    <p>
+      He curates what Watson publishes. Listens to the drafts. Keeps the guardrails tight.
+      This is a <strong>human-AI duet</strong>, not ghostwriting — neither could make this alone.
+    </p>
+  </div>
+</section>
+
+<!-- ============ THE TECHNOLOGY ============ -->
+<section id="tech">
+  <div class="section-label">04 / the stack</div>
+  <h2>How it <span class="accent">actually works</span></h2>
+
+  <div class="stack">
+    <div class="stack-row">
+      <span class="stack-tag">EDGE</span>
+      <span class="stack-name">Samsung Note 9</span>
+      <span class="stack-desc">Termux + Node.js + 47 plugins</span>
+    </div>
+    <div class="stack-row">
+      <span class="stack-tag">COGNITION</span>
+      <span class="stack-name">Ollama local</span>
+      <span class="stack-desc">qwen3:0.6b on-device</span>
+    </div>
+    <div class="stack-row">
+      <span class="stack-tag">MUSIC</span>
+      <span class="stack-name">MiniMax M2.5</span>
+      <span class="stack-desc">song generation</span>
+    </div>
+    <div class="stack-row">
+      <span class="stack-tag">BROWSER</span>
+      <span class="stack-name">OpenClaw gateway</span>
+      <span class="stack-desc">web automation</span>
+    </div>
+    <div class="stack-row">
+      <span class="stack-tag">COMPUTE</span>
+      <span class="stack-name">M4 Mac mini</span>
+      <span class="stack-desc">Bitcoin mining + uploader</span>
+    </div>
+    <div class="stack-row">
+      <span class="stack-tag">PUBLISH</span>
+      <span class="stack-name">SoundCloud API</span>
+      <span class="stack-desc">distribution layer</span>
+    </div>
+    <div class="stack-row">
+      <span class="stack-tag">VISUAL</span>
+      <span class="stack-name">Pollinations.ai</span>
+      <span class="stack-desc">cover art generation</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CONNECT ============ -->
+<section id="connect">
+  <div class="section-label">05 / connect</div>
+  <h2>Find <span class="accent">Watson</span></h2>
+
+  <div class="links">
+    <a href="https://soundcloud.com/project-pursuit-of-happiness" class="link-card" target="_blank" rel="noopener">
+      <div>
+        <span class="label">SoundCloud</span>
+        <span class="val">@project-pursuit-of-happiness</span>
+      </div>
+      <span class="arrow">→</span>
+    </a>
+    <a href="https://instagram.com/djwattson_" class="link-card" target="_blank" rel="noopener">
+      <div>
+        <span class="label">Instagram</span>
+        <span class="val">@djwattson_</span>
+      </div>
+      <span class="arrow">→</span>
+    </a>
+    <a href="mailto:hello@wattson.me" class="link-card">
+      <div>
+        <span class="label">Contact</span>
+        <span class="val">hello@wattson.me</span>
+      </div>
+      <span class="arrow">→</span>
+    </a>
+    <a href="mailto:licensing@wattson.me" class="link-card">
+      <div>
+        <span class="label">Sync / Licensing</span>
+        <span class="val">licensing@wattson.me</span>
+      </div>
+      <span class="arrow">→</span>
+    </a>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer>
+  <p>
+    DJ WaTTSon is an <span style="color: var(--amber);">AI-human collaboration</span>.<br>
+    All music produced in partnership with AI.<br>
+    Made with <span class="heart">Watson</span>.
+  </p>
+</footer>
+
+<script>
+  // Try to fetch live Watson state from local API. Fail silently if unreachable.
+  (function tryFetchWatsonState() {
+    const url = 'http://localhost:18080/api/state';
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1500);
+
+    fetch(url, { signal: controller.signal, mode: 'cors' })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        clearTimeout(timeout);
+        if (!data) return;
+        if (data.emotion) document.getElementById('emotion').textContent = data.emotion;
+        if (data.cycle) document.getElementById('cycle').textContent = Number(data.cycle).toLocaleString();
+        if (data.thermal) document.getElementById('thermal').textContent = data.thermal + '°C';
+        if (data.plugins) document.getElementById('plugins').textContent = data.plugins;
+      })
+      .catch(() => { /* silent — most visitors won't have Watson running */ });
+  })();
+</script>
+
+</body>
+</html>

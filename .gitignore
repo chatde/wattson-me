@@ -1,15 +1,5 @@
 .env
 .env.local
-.env.*.local
-node_modules/
-conversations.jsonl
-conversations.jsonl.1
-registry-state.json
-tokens.json
-*.log
 .DS_Store
-credentials.json
-*.pem
-*.p8
-*.p12
-.apple-creds/
+.vercel
+*.log
